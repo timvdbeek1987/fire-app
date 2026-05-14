@@ -713,7 +713,8 @@ export function berekenVeiligPensioenKapitaal(params, priveOpPensioendag = 0, ta
     return runMonteCarlo(po, start, nSims).kansSucces;
   };
 
-  const kandidaten = [500_000, 1_000_000, 1_500_000, 2_000_000, 2_500_000, 3_000_000,
+  const kandidaten = [50_000, 100_000, 150_000, 200_000, 300_000, 400_000, 500_000,
+                      750_000, 1_000_000, 1_500_000, 2_000_000, 2_500_000, 3_000_000,
                       3_500_000, 4_000_000, 5_000_000, 6_500_000, 8_000_000];
   const sweep = kandidaten.map(bv => ({ bv, k: kansVoor(bv) }));
 
