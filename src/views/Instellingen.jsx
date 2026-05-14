@@ -17,7 +17,8 @@ const F = ({ label, help, value, onChange, step=1, min, max, suffix, prefix }) =
   </div>
 );
 
-export default function Instellingen({ params, onParamsChange }) {
+export default function Instellingen({ params, onParamsChange, userType = 'dga' }) {
+  const isPrive = userType === 'prive';
   const [local,  setLocal]  = useState(() => ({ ...BASE_PARAMS, ...params }));
   const [saved,  setSaved]  = useState(false);
 
@@ -66,9 +67,11 @@ export default function Instellingen({ params, onParamsChange }) {
             help="Aanvullend pensioen via SPMS of lijfrente"/>
           <F label="AOW leeftijd" value={local.aowLeeftijd ?? 67} onChange={set('aowLeeftijd')} suffix="jaar" min={65} max={72}
             help="Instelbaar — overheid kan dit verhogen. Huidig: 67 jaar"/>
-          <F label="Jaarlijkse inleg BV" value={local.inlegJaarlijksBV ?? BASE_PARAMS.inlegJaarlijksBV} onChange={set('inlegJaarlijksBV')} prefix="€" step={1000}
-            help="Gemiddeld per jaar tijdens opbouwfase"/>
-          <F label="Jaarlijkse inleg Privé" value={local.inlegJaarlijksPrive ?? BASE_PARAMS.inlegJaarlijksPrive} onChange={set('inlegJaarlijksPrive')} prefix="€" step={500}/>
+          {!isPrive && (
+            <F label="Jaarlijkse inleg BV" value={local.inlegJaarlijksBV ?? BASE_PARAMS.inlegJaarlijksBV} onChange={set('inlegJaarlijksBV')} prefix="€" step={1000}
+              help="Gemiddeld per jaar tijdens opbouwfase"/>
+          )}
+          <F label={isPrive ? 'Jaarlijkse inleg' : 'Jaarlijkse inleg Privé'} value={local.inlegJaarlijksPrive ?? BASE_PARAMS.inlegJaarlijksPrive} onChange={set('inlegJaarlijksPrive')} prefix="€" step={500}/>
         </div>
 
         <div className="card">
@@ -123,7 +126,7 @@ export default function Instellingen({ params, onParamsChange }) {
             help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto)`}/>
         </div>
 
-        <div className="card">
+        {!isPrive && <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>🧾 Belastingen & DGA</div>
           <F label="Vennootschapsbelasting (VPB)" value={+(local.vennootschapsbelasting*100).toFixed(1)}
             onChange={v=>set('vennootschapsbelasting')(v/100)} step={0.5} suffix="%"
@@ -138,7 +141,7 @@ export default function Instellingen({ params, onParamsChange }) {
           <F label="Vermogensrendementsheffing (Privé)" value={+(local.vermogensrendementsheffing*100).toFixed(3)}
             onChange={v=>set('vermogensrendementsheffing')(v/100)} step={0.01} suffix="%"
             help="Box 3 effectief tarief (2024: ~2.09%)"/>
-        </div>
+        </div>}
 
         <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>🏠 Hypotheek</div>
@@ -186,9 +189,11 @@ export default function Instellingen({ params, onParamsChange }) {
 
         <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>🏦 Spaarrekening</div>
-          <F label="Spaarrente BV" value={+((local.spaarrenteBV??0.025)*100).toFixed(2)}
-            onChange={v=>set('spaarrenteBV')(v/100)} step={0.05} suffix="%"
-            help="Jaarlijkse rente op de spaarrekening van de BV"/>
+          {!isPrive && (
+            <F label="Spaarrente BV" value={+((local.spaarrenteBV??0.025)*100).toFixed(2)}
+              onChange={v=>set('spaarrenteBV')(v/100)} step={0.05} suffix="%"
+              help="Jaarlijkse rente op de spaarrekening van de BV"/>
+          )}
           <F label="Spaarrente Privé" value={+((local.spaarrentePrive??0.025)*100).toFixed(2)}
             onChange={v=>set('spaarrentePrive')(v/100)} step={0.05} suffix="%"
             help="Jaarlijkse rente op de privé spaarrekening"/>
@@ -202,13 +207,14 @@ export default function Instellingen({ params, onParamsChange }) {
           {[
             { k:'Pensioenleeftijd',    v: `${local.pensioenLeeftijd??55}j (${pensioenJaar})` },
             { k:'SPMS / AOW leeftijd', v: `${local.spmsLeeftijd??60}j / ${local.aowLeeftijd??67}j` },
-            { k:'Jaarinleg BV',        v: fmtFull(local.inlegJaarlijksBV) },
+            !isPrive && { k:'Jaarinleg BV',  v: fmtFull(local.inlegJaarlijksBV) },
+            { k: isPrive ? 'Jaarinleg' : 'Jaarinleg Privé', v: fmtFull(local.inlegJaarlijksPrive) },
             { k:'Rendement (pre/post)',v: `${(local.meanReturn*100).toFixed(1)}% / ${(local.rendementNaPensioen*100).toFixed(1)}%` },
             { k:'SD (pre/post)',       v: `${(local.sdReturn*100).toFixed(1)}% / ${((local.sdReturnNaPensioen??0.10)*100).toFixed(1)}%` },
             { k:'Inflatie gem.',       v: `${(local.inflatieGemiddeld*100).toFixed(1)}%` },
             { k:'Floor / Streef / Comfort', v: `€${Math.round((local.nettoInkomenVloer??72000)/12).toLocaleString()} / €${Math.round((local.nettoInkomenStreef??84000)/12).toLocaleString()} / €${Math.round((local.nettoInkomenDoel??90000)/12).toLocaleString()} /mnd` },
-            { k:'VPB / Box 2',         v: `${(local.vennootschapsbelasting*100).toFixed(0)}% / ${(local.dividendbelasting*100).toFixed(1)}%` },
-          ].map((item,i) => (
+            !isPrive && { k:'VPB / Box 2',  v: `${(local.vennootschapsbelasting*100).toFixed(0)}% / ${(local.dividendbelasting*100).toFixed(1)}%` },
+          ].filter(Boolean).map((item,i) => (
             <div key={i} style={{ padding:'0.6rem 0.8rem', background:'var(--paper-warm)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
               <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.61rem', color:'var(--ink-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{item.k}</div>
               <div style={{ fontWeight:600, fontSize:'0.87rem', marginTop:'0.2rem' }}>{item.v}</div>

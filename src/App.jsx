@@ -190,12 +190,21 @@ export default function App() {
     const inflatieCBS = berekenGemiddeldeInflatieCBS();
     const geboortejaar = profile?.geboortejaar ?? params.geboortejaar ?? BASE_PARAMS.geboortejaar;
     const basejaar = new Date().getFullYear();
+    const isPrive = (profile?.user_type ?? 'dga') === 'prive';
     return {
       ...BASE_PARAMS,
       inflatieGemiddeld: inflatieCBS,
       ...params,
       geboortejaar,
       basejaar,
+      ...(isPrive ? {
+        verplichtDGAsalaris:    0,
+        inlegJaarlijksBV:       0,
+        vennootschapsbelasting: 0,
+        dividendbelasting:      0,
+        inkomstenbelasting:     0,
+        priveModus:             true,
+      } : {}),
     };
   }, [params, profile]);
 
@@ -395,6 +404,8 @@ export default function App() {
   }
 
   // ── Hoofd UI ─────────────────────────────────────────────
+  const userType = profile?.user_type ?? 'dga';
+
   const sharedProps = {
     params: effectiveParams,
     start,
@@ -409,6 +420,7 @@ export default function App() {
     countdownStreef,
     birthYear,
     vermogenUpdates,
+    userType,
     onParamsChange: saveParams,
     onVoortgangUpdate: saveVoortgangUpdate,
   };

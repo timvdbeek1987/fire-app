@@ -412,7 +412,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const inkAOW  = heeftAOW  ? p.jaarlijksNettoAOW  * (cumulInflatie / cumIAtAOWStart)  * frac : 0;
 
       const behoefteNaExtern = Math.max(0, doelNetto - inkSPMS - inkAOW);
-      const maxPv = rendPvn > 0 ? rendPvn * 1.20 : 0;
+      const maxPv = p.priveModus ? prive : (rendPvn > 0 ? rendPvn * 1.20 : 0);
       const ontPv = Math.min(maxPv, behoefteNaExtern, prive);
 
       const behoefteNaPrive = Math.max(0, behoefteNaExtern - ontPv);
@@ -543,7 +543,7 @@ export function runMonteCarlo(params, start, nSims = 2500, so = null) {
   const pensionLft = p.pensioenLeeftijd ?? 55;
   const idx85 = allPaths[0].findIndex(r => r.leeftijd === 85);
   const kansSucces = idx85 >= 0
-    ? Math.round(allPaths.filter(path => (path[idx85]?.bv ?? 0) > 0).length / allPaths.length * 100)
+    ? Math.round(allPaths.filter(path => ((path[idx85]?.bv ?? 0) + (path[idx85]?.prive ?? 0)) > 0).length / allPaths.length * 100)
     : 0;
 
   const depletionDist = (() => {
@@ -634,7 +634,7 @@ export function runMonteCarloStrategie(params, start, strategie = null, nSims = 
 
   const idx85 = allPaths[0].findIndex(r => r.leeftijd === 85);
   const kansSucces = idx85 >= 0
-    ? Math.round(allPaths.filter(path => (path[idx85]?.bv ?? 0) > 0).length / allPaths.length * 100)
+    ? Math.round(allPaths.filter(path => ((path[idx85]?.bv ?? 0) + (path[idx85]?.prive ?? 0)) > 0).length / allPaths.length * 100)
     : 0;
 
   const depletionDist = (() => {
@@ -706,8 +706,10 @@ export function berekenVeiligPensioenKapitaal(params, priveOpPensioendag = 0, ta
   const pensioenJaar = birthYear + pensioenLft;
   const po = { ...p, inlegJaarlijksBV: 0, inlegJaarlijksPrive: 0 };
 
-  const kansVoor = (bv) => {
-    const start = { bv, prive: priveOpPensioendag, jaar: pensioenJaar, maand: 1 };
+  const kansVoor = (portfolioWaarde) => {
+    const start = p.priveModus
+      ? { bv: 0, prive: portfolioWaarde, jaar: pensioenJaar, maand: 1 }
+      : { bv: portfolioWaarde, prive: priveOpPensioendag, jaar: pensioenJaar, maand: 1 };
     return runMonteCarlo(po, start, nSims).kansSucces;
   };
 

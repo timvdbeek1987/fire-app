@@ -6,28 +6,44 @@ const STAPPEN = ['Profiel', 'Portefeuille', 'Inkomensdoel', 'Inleg', 'Klaar'];
 const CURRENT_YEAR  = new Date().getFullYear();
 const CURRENT_MONTH = new Date().getMonth() + 1;
 
+// F buiten de component — anders verlies je focus na elke toetsaanslag
+const F = ({ label, value, onChange, type = 'number', help, min, max, step, placeholder }) => (
+  <div className="form-group">
+    <label className="form-label">{label}</label>
+    <input
+      type={type} className="form-input"
+      value={value}
+      onChange={e => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
+      min={min} max={max} step={step ?? 1}
+      placeholder={placeholder}
+    />
+    {help && <div style={{ marginTop: '0.3rem', fontSize: '0.72rem', color: 'var(--text-3)', lineHeight: 1.5 }}>{help}</div>}
+  </div>
+);
+
 export default function Onboarding({ user, onComplete }) {
   const [stap, setStap] = useState(0);
 
   // Stap 1 — Profiel
   const [geboortejaar,      setGeboortejaar]      = useState(1985);
   const [pensioenLeeftijd,  setPensioenLeeftijd]  = useState(55);
-  const [userType,          setUserType]          = useState('dga'); // 'dga' | 'prive'
+  const [userType,          setUserType]          = useState('prive'); // default prive
 
   // Stap 2 — Portefeuille
   const [bvWaarde,    setBvWaarde]    = useState('');
   const [priveWaarde, setPriveWaarde] = useState('');
 
   // Stap 3 — Inkomensdoel
-  const [nettoInkomenDoel,   setNettoInkomenDoel]   = useState(90000);
-  const [nettoInkomenVloer,  setNettoInkomenVloer]  = useState(72000);
-  const [nettoInkomenStreef, setNettoInkomenStreef]  = useState(84000);
+  const [nettoInkomenDoel,   setNettoInkomenDoel]   = useState(48000);
+  const [nettoInkomenVloer,  setNettoInkomenVloer]  = useState(36000);
+  const [nettoInkomenStreef, setNettoInkomenStreef]  = useState(42000);
 
   // Stap 4 — Inleg
   const [inlegBV,     setInlegBV]     = useState(60000);
-  const [inlegPrive,  setInlegPrive]  = useState(3000);
+  const [inlegPrive,  setInlegPrive]  = useState(500);
 
-  const leeftijd = CURRENT_YEAR - geboortejaar;
+  const isPrive     = userType === 'prive';
+  const leeftijd    = CURRENT_YEAR - geboortejaar;
   const pensioenJaar = geboortejaar + pensioenLeeftijd;
 
   const handleComplete = () => {
@@ -44,13 +60,13 @@ export default function Onboarding({ user, onComplete }) {
         nettoInkomenDoel,
         nettoInkomenVloer,
         nettoInkomenStreef,
-        inlegJaarlijksBV:    inlegBV,
+        inlegJaarlijksBV:    isPrive ? 0 : inlegBV,
         inlegJaarlijksPrive: inlegPrive,
       },
       portfolioStart: {
-        datum:  vandaag,
-        bv:     Number(bvWaarde)    || 0,
-        prive:  Number(priveWaarde) || 0,
+        datum:    vandaag,
+        bv:       isPrive ? 0 : (Number(bvWaarde) || 0),
+        prive:    Number(priveWaarde) || 0,
         inleg_bv: 0,
       },
     });
@@ -79,19 +95,6 @@ export default function Onboarding({ user, onComplete }) {
           )}
         </div>
       ))}
-    </div>
-  );
-
-  const F = ({ label, value, onChange, type = 'number', help, min, max, step }) => (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
-      <input
-        type={type} className="form-input"
-        value={value}
-        onChange={e => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
-        min={min} max={max} step={step ?? 1}
-      />
-      {help && <div style={{ marginTop: '0.3rem', fontSize: '0.72rem', color: 'var(--text-3)', lineHeight: 1.5 }}>{help}</div>}
     </div>
   );
 
@@ -127,8 +130,8 @@ export default function Onboarding({ user, onComplete }) {
               <label className="form-label">Type belegger</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 {[
-                  { id: 'dga', titel: 'DGA / BV', omschrijving: 'Je spaart via een BV en hebt ook een privéportefeuille' },
                   { id: 'prive', titel: 'Privébelegger', omschrijving: 'Je belegt alleen privé (box 3), geen BV' },
+                  { id: 'dga',   titel: 'DGA / BV',      omschrijving: 'Je spaart via een BV én hebt een privéportefeuille' },
                 ].map(t => (
                   <button
                     key={t.id}
@@ -147,11 +150,6 @@ export default function Onboarding({ user, onComplete }) {
                   </button>
                 ))}
               </div>
-              {userType === 'prive' && (
-                <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--amber-soft)', borderRadius: 'var(--r-sm)', fontSize: '0.78rem', color: 'var(--amber)' }}>
-                  ⚠️ Privé-modus is in ontwikkeling. De berekeningen zijn nu gebaseerd op DGA-structuur.
-                </div>
-              )}
             </div>
           </>
         );
@@ -167,19 +165,23 @@ export default function Onboarding({ user, onComplete }) {
               </p>
             </div>
 
+            {!isPrive && (
+              <F
+                label="BV beleggingsrekening (€)"
+                value={bvWaarde}
+                onChange={v => setBvWaarde(v)}
+                min={0}
+                help="Totale waarde van je BV-beleggingsportefeuille vandaag"
+              />
+            )}
             <F
-              label="BV beleggingsrekening (€)"
-              value={bvWaarde}
-              onChange={v => setBvWaarde(v)}
-              min={0}
-              help="Totale waarde van je BV-beleggingsportefeuille vandaag"
-            />
-            <F
-              label="Privé portefeuille (€)"
+              label={isPrive ? 'Privé portefeuille (€)' : 'Privé portefeuille (€)'}
               value={priveWaarde}
               onChange={v => setPriveWaarde(v)}
               min={0}
-              help="Waarde van je privé beleggingsrekening (DEGIRO, Bolero, etc.)"
+              help={isPrive
+                ? 'Totale waarde van je beleggingsrekening (DEGIRO, IBKR, etc.)'
+                : 'Waarde van je privé beleggingsrekening (DEGIRO, Bolero, etc.)'}
             />
 
             <div style={{
@@ -190,7 +192,7 @@ export default function Onboarding({ user, onComplete }) {
                 Totaal vandaag
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 700, color: 'var(--accent)' }}>
-                €{((Number(bvWaarde) || 0) + (Number(priveWaarde) || 0)).toLocaleString('nl-NL')}
+                €{((!isPrive ? (Number(bvWaarde) || 0) : 0) + (Number(priveWaarde) || 0)).toLocaleString('nl-NL')}
               </div>
             </div>
           </>
@@ -242,23 +244,27 @@ export default function Onboarding({ user, onComplete }) {
               <div className="section-eyebrow">Stap 4 van 4</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Jaarlijkse inleg</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
-                Hoeveel leg je gemiddeld per jaar bij? Dit bepaalt hoe snel je doel nadert.
+                {isPrive
+                  ? 'Hoeveel leg je gemiddeld per jaar bij? Dit bepaalt hoe snel je doel nadert.'
+                  : 'Hoeveel leg je gemiddeld per jaar bij via BV en privé?'}
               </p>
             </div>
 
+            {!isPrive && (
+              <F
+                label="Jaarlijkse inleg BV (€)"
+                value={inlegBV}
+                onChange={setInlegBV}
+                min={0} step={1000}
+                help={`€${Math.round(inlegBV/12).toLocaleString()}/mnd — inleg via DGA-salaris, dividend of rechtstreeks`}
+              />
+            )}
             <F
-              label="Jaarlijkse inleg BV (€)"
-              value={inlegBV}
-              onChange={setInlegBV}
-              min={0} step={1000}
-              help={`€${Math.round(inlegBV/12).toLocaleString()}/mnd — inleg via DGA-salaris, dividend of rechtstreeks`}
-            />
-            <F
-              label="Jaarlijkse inleg privé (€)"
+              label={isPrive ? 'Jaarlijkse inleg (€)' : 'Jaarlijkse inleg privé (€)'}
               value={inlegPrive}
               onChange={setInlegPrive}
               min={0} step={100}
-              help={`€${Math.round(inlegPrive/12).toLocaleString()}/mnd — extra sparen / beleggen privé`}
+              help={`€${Math.round(inlegPrive/12).toLocaleString()}/mnd`}
             />
 
             <div style={{
@@ -269,7 +275,7 @@ export default function Onboarding({ user, onComplete }) {
                 Totale jaarlijkse inleg
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--green)' }}>
-                €{(inlegBV + inlegPrive).toLocaleString('nl-NL')}/jaar
+                €{((isPrive ? 0 : inlegBV) + inlegPrive).toLocaleString('nl-NL')}/jaar
               </div>
             </div>
           </>
@@ -291,10 +297,10 @@ export default function Onboarding({ user, onComplete }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
                   <div><span style={{ color: 'var(--text-3)' }}>Geboortejaar</span><br /><b>{geboortejaar}</b></div>
                   <div><span style={{ color: 'var(--text-3)' }}>Pensioenleeftijd</span><br /><b>{pensioenLeeftijd} jaar</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Portefeuille nu</span><br /><b>€{((Number(bvWaarde)||0)+(Number(priveWaarde)||0)).toLocaleString()}</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Jaarlijkse inleg</span><br /><b>€{(inlegBV+inlegPrive).toLocaleString()}</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Portefeuille nu</span><br /><b>€{((!isPrive ? (Number(bvWaarde)||0) : 0)+(Number(priveWaarde)||0)).toLocaleString()}</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Jaarlijkse inleg</span><br /><b>€{((isPrive ? 0 : inlegBV)+inlegPrive).toLocaleString()}</b></div>
                   <div><span style={{ color: 'var(--text-3)' }}>Inkomensdoel</span><br /><b>€{Math.round(nettoInkomenDoel/12).toLocaleString()}/mnd</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Type</span><br /><b>{userType === 'dga' ? 'DGA / BV' : 'Privé'}</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Type</span><br /><b>{isPrive ? 'Privébelegger' : 'DGA / BV'}</b></div>
                 </div>
               </div>
 
@@ -314,13 +320,15 @@ export default function Onboarding({ user, onComplete }) {
     }
   };
 
+  const volgendeDisabled =
+    stap === 1 && !priveWaarde && (isPrive || !bvWaarde);
+
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
       background: 'var(--bg)', padding: '2rem 1rem', paddingTop: '3rem',
     }}>
       <div style={{ maxWidth: 560, width: '100%' }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             width: 48, height: 48, borderRadius: 12,
@@ -339,19 +347,14 @@ export default function Onboarding({ user, onComplete }) {
           {stap < 4 && (
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
               {stap > 0 && (
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setStap(s => s - 1)}
-                >
+                <button className="btn btn-outline" onClick={() => setStap(s => s - 1)}>
                   ← Terug
                 </button>
               )}
               <button
                 className="btn btn-primary"
                 onClick={() => setStap(s => s + 1)}
-                disabled={
-                  (stap === 1 && !bvWaarde && !priveWaarde)
-                }
+                disabled={volgendeDisabled}
               >
                 {stap === 3 ? 'Afronden →' : 'Volgende →'}
               </button>

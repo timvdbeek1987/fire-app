@@ -25,8 +25,9 @@ const ChartTip = ({ active, payload, label }) => {
 export default function Dashboard({
   params, start, mcResult, pensioenKapitaal, pkLoading,
   pkVloer, pkStreef, priveOpPensioendag, countdown, countdownVloer, countdownStreef,
-  birthYear = BASE_PARAMS.geboortejaar,
+  birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
 }) {
+  const isPrive = userType === 'prive';
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
   const bvNu             = start.bv   ?? 0;
@@ -95,26 +96,33 @@ export default function Dashboard({
       </div>
 
       {/* KPI rij */}
-      <div className="grid-4" style={{ marginBottom: '1.25rem' }}>
-        <div className="kpi blue">
-          <div className="kpi-label">BV Portefeuille</div>
-          <div className="kpi-value">{fmt(bvNu)}</div>
-          <div className="kpi-sub">beleggingsrekening</div>
-        </div>
+      <div className={isPrive ? 'grid-3' : 'grid-4'} style={{ marginBottom: '1.25rem' }}>
+        {!isPrive && (
+          <div className="kpi blue">
+            <div className="kpi-label">BV Portefeuille</div>
+            <div className="kpi-value">{fmt(bvNu)}</div>
+            <div className="kpi-sub">beleggingsrekening</div>
+          </div>
+        )}
         <div className="kpi green">
-          <div className="kpi-label">Privé Portefeuille</div>
+          <div className="kpi-label">{isPrive ? 'Portefeuille' : 'Privé Portefeuille'}</div>
           <div className="kpi-value">{fmt(priveNu)}</div>
-          <div className="kpi-sub">box 3 beleggen</div>
+          <div className="kpi-sub">{isPrive ? 'beleggingsrekening' : 'box 3 beleggen'}</div>
         </div>
-        <div className="kpi gold">
-          <div className="kpi-label">Totaal Vermogen</div>
-          <div className="kpi-value">{fmt(totaalNu)}</div>
-          <div className="kpi-sub">BV + privé gecombineerd</div>
-        </div>
+        {!isPrive && (
+          <div className="kpi gold">
+            <div className="kpi-label">Totaal Vermogen</div>
+            <div className="kpi-value">{fmt(totaalNu)}</div>
+            <div className="kpi-sub">BV + privé gecombineerd</div>
+          </div>
+        )}
         <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
           <div className="kpi-label">
             Kans succes
-            <InfoTip text="% simulaties waarbij BV > 0 op leeftijd 85 (2500 Monte Carlo paden, 80e percentiel veiligheidsgrens)." />
+            <InfoTip text={isPrive
+              ? '% simulaties waarbij je portefeuille > 0 is op leeftijd 85 (2500 Monte Carlo paden).'
+              : '% simulaties waarbij BV > 0 op leeftijd 85 (2500 Monte Carlo paden, 80e percentiel veiligheidsgrens).'}
+            />
           </div>
           <div className="kpi-value" style={{ color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
             {kansSucces}%
@@ -289,8 +297,10 @@ export default function Dashboard({
               />
               <Tooltip content={<ChartTip />} />
               <ReferenceLine x={pensioenJaar} stroke="var(--amber)" strokeDasharray="4 3" label={{ value: 'Pensioen', fill: 'var(--amber)', fontSize: 10, fontFamily: 'var(--font-mono)' }} />
-              <Area dataKey="bvP50"    name="BV (P50)"   stroke="var(--accent)" fill="url(#gradBV)"    strokeWidth={2} dot={false} />
-              <Area dataKey="priveP50" name="Privé (P50)" stroke="var(--green)"  fill="url(#gradPrive)" strokeWidth={2} dot={false} />
+              {!isPrive && (
+                <Area dataKey="bvP50" name="BV (P50)" stroke="var(--accent)" fill="url(#gradBV)" strokeWidth={2} dot={false} />
+              )}
+              <Area dataKey="priveP50" name={isPrive ? 'Portefeuille (P50)' : 'Privé (P50)'} stroke="var(--green)" fill="url(#gradPrive)" strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -307,9 +317,11 @@ export default function Dashboard({
         color: 'var(--text-3)',
         lineHeight: 1.7,
       }}>
-        💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als
-        het minimale BV-bedrag waarbij 80% van de paden de BV in stand houdt tot leeftijd 85.
-        Voeg portefeuille-updates toe via <b>Voortgang</b> om de projectie actueel te houden.
+        {isPrive
+          ? '💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als het minimale privévermogen waarbij 80% van de paden de portefeuille in stand houdt tot leeftijd 85.'
+          : '💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als het minimale BV-bedrag waarbij 80% van de paden de BV in stand houdt tot leeftijd 85.'
+        }
+        {' '}Voeg portefeuille-updates toe via <b>Voortgang</b> om de projectie actueel te houden.
       </div>
     </div>
   );
