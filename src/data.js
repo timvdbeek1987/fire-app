@@ -203,7 +203,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
   const rows = [];
   const jaarlastVoorBase = (p.maandelijkseHypotheeklast ?? 2000) * 12;
 
-  let guardrailsDoel = p.nettoInkomenDoel - jaarlastVoorBase;
+  let guardrailsDoel = p.nettoInkomenDoel;
   let guardrailsPortoRef = null;
 
   let cumIAtSPMSStart = null;
@@ -400,7 +400,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
         const vpwCapped = maxPct > 0 ? Math.min(vpwRaw, (bv + prive) * maxPct) : vpwRaw;
         doelNominaalVol = Math.max(0, vpwCapped * leeftijdFactor);
       } else {
-        const leefstijlNominaal = (p.nettoInkomenDoel - jaarlastVoor) * cumulInflatie;
+        const leefstijlNominaal = p.nettoInkomenDoel * cumulInflatie;
         doelNominaalVol = Math.max(0, (leefstijlNominaal + jaarlastHypo) * leeftijdFactor);
       }
 

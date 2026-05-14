@@ -340,6 +340,9 @@ export default function Dashboard({
               />
               <Tooltip content={<ChartTip />} />
               <ReferenceLine x={pensioenJaar} stroke="var(--amber)" strokeDasharray="4 3" label={{ value: 'Pensioen', fill: 'var(--amber)', fontSize: 10, fontFamily: 'var(--font-mono)' }} />
+              {pkVloerVal > 0 && <ReferenceLine y={pkVloerVal} stroke="var(--accent)" strokeDasharray="3 4" strokeOpacity={0.6} label={{ value: 'Floor', position: 'insideTopLeft', fill: 'var(--accent)', fontSize: 9, fontFamily: 'var(--font-mono)' }} />}
+              {pkStreefVal > 0 && <ReferenceLine y={pkStreefVal} stroke="var(--green)" strokeDasharray="3 4" strokeOpacity={0.6} label={{ value: 'Streef', position: 'insideTopLeft', fill: 'var(--green)', fontSize: 9, fontFamily: 'var(--font-mono)' }} />}
+              {pkComfort > 0 && <ReferenceLine y={pkComfort} stroke="var(--amber)" strokeDasharray="3 4" strokeOpacity={0.6} label={{ value: 'Comfort', position: 'insideTopLeft', fill: 'var(--amber)', fontSize: 9, fontFamily: 'var(--font-mono)' }} />}
               {!isPrive && (
                 <Area dataKey="bvP50" name="BV (P50)" stroke="var(--accent)" fill="url(#gradBV)" strokeWidth={2} dot={false} />
               )}

@@ -63,8 +63,8 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
           <F label="Geboortejaar" value={geboortejaar} onChange={set('geboortejaar')} min={1950} max={2005}/>
           <F label="Pensioenleeftijd" value={local.pensioenLeeftijd ?? 55} onChange={set('pensioenLeeftijd')} suffix="jaar" min={45} max={70}
             help={`Pensioenjaar: ${pensioenJaar} (${pensioenJaar-currentYear} jaar te gaan)`}/>
-          <F label={isPrive ? 'Aanvullend pensioen leeftijd' : 'SPMS start leeftijd'} value={local.spmsLeeftijd ?? 60} onChange={set('spmsLeeftijd')} suffix="jaar" min={55} max={70}
-            help={isPrive ? 'Lijfrente of ander aanvullend pensioen (indien van toepassing)' : 'Aanvullend pensioen via SPMS of lijfrente'}/>
+          <F label="Pensioen / lijfrente leeftijd" value={local.spmsLeeftijd ?? 60} onChange={set('spmsLeeftijd')} suffix="jaar" min={55} max={70}
+            help="Leeftijd waarop aanvullend pensioen of lijfrente ingaat"/>
           <F label="AOW leeftijd" value={local.aowLeeftijd ?? 67} onChange={set('aowLeeftijd')} suffix="jaar" min={65} max={72}
             help="Instelbaar — overheid kan dit verhogen. Huidig: 67 jaar"/>
           {!isPrive && (
@@ -112,17 +112,17 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
         <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>💰 Inkomen na pensioen</div>
           <div style={{ padding:'0.6rem 0.8rem', background:'rgba(41,128,185,0.06)', borderRadius:'var(--r)', border:'1px solid rgba(41,128,185,0.15)', marginBottom:'0.8rem', fontSize:'0.75rem', color:'var(--ink-muted)', fontFamily:'var(--font-mono)', lineHeight:1.6 }}>
-            Drie tiers: <strong>Floor</strong> = minimaal nodig, <strong>Streef</strong> = gewenst, <strong>Comfort</strong> = maximum. De engine houdt rekening met het vervallen van de hypotheeklast in {jaarHypo}.
+            Drie tiers: <strong>Floor</strong> = minimaal nodig, <strong>Streef</strong> = gewenst, <strong>Comfort</strong> = maximum. Bedragen zijn <strong>exclusief hypotheeklast</strong> — die wordt apart opgeteld zolang de hypotheek loopt (tot {jaarHypo}).
           </div>
           <F label="Floor — minimaal netto/jaar (€)" value={local.nettoInkomenVloer ?? BASE_PARAMS.nettoInkomenVloer} onChange={set('nettoInkomenVloer')} prefix="€" step={1000}
-            help={`Minimum levensstandaard inclusief hypotheeklast. Na ${jaarHypo} (hypotheekvrij) vervalt de hypotheekcomponent automatisch.`}/>
+            help={`Minimale leefstijl excl. hypotheek. De engine telt hypotheeklast (€${Math.round((local.maandelijkseHypotheeklast??2000)*12).toLocaleString()}/jr) automatisch op tot ${jaarHypo}.`}/>
           <F label="Streef — gewenst netto/jaar (€)" value={local.nettoInkomenStreef ?? BASE_PARAMS.nettoInkomenStreef} onChange={set('nettoInkomenStreef')} prefix="€" step={1000}
-            help={`Streefdoel inclusief hypotheeklast. Na ${jaarHypo} daalt de behoefte automatisch mee.`}/>
+            help={`Gewenste leefstijl excl. hypotheek. In euro's van nu.`}/>
           <F label="Comfort — max netto/jaar (€)" value={local.nettoInkomenDoel ?? BASE_PARAMS.nettoInkomenDoel} onChange={set('nettoInkomenDoel')} prefix="€" step={1000}
-            help={`Maximum/comfort inclusief hypotheeklast. Na ${jaarHypo} daalt de behoefte automatisch mee. In euro's van nu.`}/>
-          <F label={isPrive ? 'Lijfrente / aanvullend pensioen netto/jaar' : 'SPMS / aanvullend pensioen netto/jaar'}
+            help={`Comfortabel leven excl. hypotheek. In euro's van nu.`}/>
+          <F label="Pensioen / lijfrente netto/jaar"
             value={local.jaarlijksNettoSPMS ?? (isPrive ? 0 : BASE_PARAMS.jaarlijksNettoSPMS)} onChange={set('jaarlijksNettoSPMS')} prefix="€" step={250}
-            help={isPrive ? `Aanvullend netto inkomen vanaf leeftijd ${local.spmsLeeftijd??60} jaar (bijv. lijfrente). Standaard €0.` : `Vanaf leeftijd ${local.spmsLeeftijd??60} jaar (netto)`}/>
+            help={`Netto pensioeninkomen (werkgever, lijfrente, etc.) vanaf leeftijd ${local.spmsLeeftijd??60} jaar. Verlaagt de onttrekkingsbehoefte.`}/>
           <F label="AOW netto/jaar" value={local.jaarlijksNettoAOW ?? BASE_PARAMS.jaarlijksNettoAOW} onChange={set('jaarlijksNettoAOW')} prefix="€" step={250}
             help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto)`}/>
         </div>
@@ -207,7 +207,7 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(190px,1fr))', gap:'0.5rem' }}>
           {[
             { k:'Pensioenleeftijd',    v: `${local.pensioenLeeftijd??55}j (${pensioenJaar})` },
-            { k:'SPMS / AOW leeftijd', v: `${local.spmsLeeftijd??60}j / ${local.aowLeeftijd??67}j` },
+            { k:'Pensioen / AOW leeftijd', v: `${local.spmsLeeftijd??60}j / ${local.aowLeeftijd??67}j` },
             !isPrive && { k:'Jaarinleg BV',  v: fmtFull(local.inlegJaarlijksBV) },
             { k: isPrive ? 'Jaarinleg' : 'Jaarinleg Privé', v: fmtFull(local.inlegJaarlijksPrive) },
             { k:'Rendement (pre/post)',v: `${(local.meanReturn*100).toFixed(1)}% / ${(local.rendementNaPensioen*100).toFixed(1)}%` },
