@@ -124,12 +124,13 @@ export default function App() {
   const [pkCache,         setPkCache]         = useState(null);
 
   // Computed / simulation
-  const [mcResult,    setMcResult]    = useState(null);
-  const [mcRunning,   setMcRunning]   = useState(false);
-  const [pkResult,    setPkResult]    = useState(null);
-  const [pkLoading,   setPkLoading]   = useState(false);
-  const [pkVloer,     setPkVloer]     = useState(null);
-  const [pkStreef,    setPkStreef]     = useState(null);
+  const [mcResult,       setMcResult]       = useState(null);
+  const [mcRunning,      setMcRunning]      = useState(false);
+  const [pkResult,       setPkResult]       = useState(null);
+  const [pkLoading,      setPkLoading]      = useState(false);
+  const [pkVloer,        setPkVloer]        = useState(null);
+  const [pkStreef,       setPkStreef]        = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Auth: listen for changes
   useEffect(() => {
@@ -148,10 +149,12 @@ export default function App() {
   // Load user data when user logs in
   useEffect(() => {
     if (!user) return;
+    setProfileLoading(true);
     (async () => {
       // Load profile
       const prof = await loadProfile(user.id);
       setProfile(prof);
+      setProfileLoading(false);
 
       // Load fire_data (params)
       const fireData = await loadFireData(user.id);
@@ -392,16 +395,18 @@ export default function App() {
     return <LoginScreen />;
   }
 
-  // ── Onboarding ───────────────────────────────────────────
-  if (supabaseEnabled && user && profile && !profile.onboarding_completed) {
-    return <Onboarding user={user} onComplete={handleOnboardingComplete} />;
+  // ── Profiel laden ────────────────────────────────────────
+  if (supabaseEnabled && user && profileLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)', fontSize: '0.85rem' }}>Profiel laden…</div>
+      </div>
+    );
   }
 
-  // Nog geen profiel geladen maar supabase actief → nog even wachten
-  if (supabaseEnabled && user && !profile) {
-    return (
-      <Onboarding user={user} onComplete={handleOnboardingComplete} />
-    );
+  // ── Onboarding ───────────────────────────────────────────
+  if (supabaseEnabled && user && (!profile || !profile.onboarding_completed)) {
+    return <Onboarding user={user} onComplete={handleOnboardingComplete} />;
   }
 
   // ── Hoofd UI ─────────────────────────────────────────────
