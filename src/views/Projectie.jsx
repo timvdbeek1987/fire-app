@@ -24,8 +24,9 @@ const ChartTip = ({ active, payload, label }) => {
 
 export default function Projectie({
   params, start, mcResult, pensioenKapitaal,
-  pkVloer, pkStreef, birthYear = BASE_PARAMS.geboortejaar,
+  pkVloer, pkStreef, birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
 }) {
+  const isPrive = userType === 'prive';
   const [tabIndex, setTabIndex] = useState(0);
   const TABS = ['Portfolio', 'Doelcurves', 'Percentielband', 'Tabel'];
 
@@ -68,7 +69,9 @@ export default function Projectie({
         totaalP25:     r.totaalP25,
         totaalP50:     r.totaalP50,
         totaalP75:     r.totaalP75,
+        priveP25:      r.priveP25,
         priveP50:      r.priveP50,
+        priveP75:      r.priveP75,
         doelCurve:     berekenVereistKapitaalAnalytisch(params,  r.leeftijd) * sfComfort,
         doelCurveStreef: berekenVereistKapitaalAnalytisch(streefP, r.leeftijd) * sfStreef,
         doelCurveVloer:  berekenVereistKapitaalAnalytisch(vloerP,  r.leeftijd) * sfVloer,
@@ -103,13 +106,13 @@ export default function Projectie({
         </div>
       </div>
 
-      {/* Tab: Portfolio (BV P50 + Privé P50) */}
+      {/* Tab: Portfolio */}
       {tabIndex === 0 && (
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">BV + Privé portefeuille (mediaan)</div>
-              <div className="card-subtitle">P50 · 2500 Monte Carlo paden · €reëel</div>
+              <div className="card-title">{isPrive ? 'Portefeuille (mediaan)' : 'BV + Privé portefeuille (mediaan)'}</div>
+              <div className="card-subtitle">P50 · 2500 Monte Carlo paden · €nominaal</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={320}>
@@ -129,8 +132,8 @@ export default function Projectie({
               <YAxis tickFormatter={v => v>=1e6?`€${(v/1e6).toFixed(1)}M`:`€${Math.round(v/1000)}K`} tick={{ fontFamily:'var(--font-mono)', fontSize:10, fill:'var(--text-3)' }} axisLine={false} tickLine={false} width={60}/>
               <Tooltip content={<ChartTip/>}/>
               <ReferenceLine x={pensioenJaar} stroke="var(--amber)" strokeDasharray="4 3"/>
-              <Area dataKey="bvP50"    name="BV (P50)"    stroke="var(--accent)" fill="url(#gBV)" strokeWidth={2} dot={false}/>
-              <Area dataKey="priveP50" name="Privé (P50)" stroke="var(--green)"  fill="url(#gPv)" strokeWidth={2} dot={false}/>
+              {!isPrive && <Area dataKey="bvP50"    name="BV (P50)"    stroke="var(--accent)" fill="url(#gBV)" strokeWidth={2} dot={false}/>}
+              <Area dataKey="priveP50" name={isPrive ? 'Portefeuille (P50)' : 'Privé (P50)'} stroke="var(--green)" fill="url(#gPv)" strokeWidth={2} dot={false}/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -172,16 +175,16 @@ export default function Projectie({
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">BV percentielband (P25–P75)</div>
-              <div className="card-subtitle">Onzekerheidsrange rond mediaan (P50)</div>
+              <div className="card-title">{isPrive ? 'Portefeuille percentielband (P25–P75)' : 'Totaal portefeuille percentielband (P25–P75)'}</div>
+              <div className="card-subtitle">Onzekerheidsrange rond mediaan (P50) · €nominaal</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <AreaChart data={chartData} margin={{ top:8, right:8, bottom:8, left:0 }}>
               <defs>
                 <linearGradient id="gBand" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="var(--accent)" stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.03}/>
+                  <stop offset="5%"  stopColor="var(--green)" stopOpacity={0.15}/>
+                  <stop offset="95%" stopColor="var(--green)" stopOpacity={0.03}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
@@ -189,9 +192,9 @@ export default function Projectie({
               <YAxis tickFormatter={v => v>=1e6?`€${(v/1e6).toFixed(1)}M`:`€${Math.round(v/1000)}K`} tick={{ fontFamily:'var(--font-mono)', fontSize:10, fill:'var(--text-3)' }} axisLine={false} tickLine={false} width={60}/>
               <Tooltip content={<ChartTip/>}/>
               <ReferenceLine x={pensioenJaar} stroke="var(--amber)" strokeDasharray="4 3"/>
-              <Area dataKey="bvP75" name="BV P75" stroke="none" fill="url(#gBand)" dot={false}/>
-              <Area dataKey="bvP50" name="BV P50" stroke="var(--accent)" fill="none" strokeWidth={2} dot={false}/>
-              <Area dataKey="bvP25" name="BV P25" stroke="none" fill="white" dot={false}/>
+              <Area dataKey={isPrive ? 'priveP75' : 'totaalP75'} name="P75" stroke="none" fill="url(#gBand)" dot={false}/>
+              <Area dataKey={isPrive ? 'priveP50' : 'totaalP50'} name="P50" stroke="var(--green)" fill="none" strokeWidth={2} dot={false}/>
+              <Area dataKey={isPrive ? 'priveP25' : 'totaalP25'} name="P25" stroke="none" fill="var(--bg)" dot={false}/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -209,10 +212,20 @@ export default function Projectie({
                 <tr>
                   <th>Jaar</th>
                   <th>Lft</th>
-                  <th className="num">BV P25</th>
-                  <th className="num">BV P50</th>
-                  <th className="num">BV P75</th>
-                  <th className="num">Privé P50</th>
+                  {isPrive ? (
+                    <>
+                      <th className="num">P25</th>
+                      <th className="num">P50</th>
+                      <th className="num">P75</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="num">BV P25</th>
+                      <th className="num">BV P50</th>
+                      <th className="num">BV P75</th>
+                      <th className="num">Privé P50</th>
+                    </>
+                  )}
                   <th className="num">Totaal P50</th>
                   <th className="num">Doel comfort</th>
                 </tr>
@@ -224,10 +237,20 @@ export default function Projectie({
                     <tr key={i} style={r.leeftijd === pensioenLeeftijd ? { background:'rgba(217,119,6,0.07)' } : {}}>
                       <td style={{ fontFamily:'var(--font-mono)', fontWeight: r.leeftijd===pensioenLeeftijd?700:400 }}>{r.jaar}</td>
                       <td style={{ fontFamily:'var(--font-mono)' }}>{r.leeftijd}j</td>
-                      <td className="num">{fmt(r.bvP25)}</td>
-                      <td className="num"><b>{fmt(r.bvP50)}</b></td>
-                      <td className="num">{fmt(r.bvP75)}</td>
-                      <td className="num">{fmt(r.priveP50)}</td>
+                      {isPrive ? (
+                        <>
+                          <td className="num">{fmt(r.priveP25)}</td>
+                          <td className="num"><b>{fmt(r.priveP50)}</b></td>
+                          <td className="num">{fmt(r.priveP75)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="num">{fmt(r.bvP25)}</td>
+                          <td className="num"><b>{fmt(r.bvP50)}</b></td>
+                          <td className="num">{fmt(r.bvP75)}</td>
+                          <td className="num">{fmt(r.priveP50)}</td>
+                        </>
+                      )}
                       <td className="num"><b>{fmt(r.totaalP50)}</b></td>
                       <td className="num" style={{ color:'var(--amber)' }}>{fmt(r.doelCurve)}</td>
                     </tr>
@@ -242,7 +265,7 @@ export default function Projectie({
       {/* Kans succes */}
       <div style={{ marginTop:'1rem', padding:'0.75rem 1rem', borderRadius:'var(--r)', background:'var(--surface-2)', border:'1px solid var(--border)', fontFamily:'var(--font-mono)', fontSize:'0.72rem', color:'var(--text-3)' }}>
         Kans succes op comfort-doelvermogen: <b style={{ color: mcResult.kansSucces >= 80 ? 'var(--green)' : 'var(--amber)' }}>{mcResult.kansSucces}%</b>
-        {' '}· 2500 paden · Grens: BV &gt; 0 op leeftijd 85
+        {' '}· 2500 paden · Grens: portefeuille &gt; 0 op leeftijd 85 · onttrekking op comfort-niveau
       </div>
     </div>
   );
