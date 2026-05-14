@@ -63,8 +63,8 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
           <F label="Geboortejaar" value={geboortejaar} onChange={set('geboortejaar')} min={1950} max={2005}/>
           <F label="Pensioenleeftijd" value={local.pensioenLeeftijd ?? 55} onChange={set('pensioenLeeftijd')} suffix="jaar" min={45} max={70}
             help={`Pensioenjaar: ${pensioenJaar} (${pensioenJaar-currentYear} jaar te gaan)`}/>
-          <F label="SPMS start leeftijd" value={local.spmsLeeftijd ?? 60} onChange={set('spmsLeeftijd')} suffix="jaar" min={55} max={70}
-            help="Aanvullend pensioen via SPMS of lijfrente"/>
+          <F label={isPrive ? 'Aanvullend pensioen leeftijd' : 'SPMS start leeftijd'} value={local.spmsLeeftijd ?? 60} onChange={set('spmsLeeftijd')} suffix="jaar" min={55} max={70}
+            help={isPrive ? 'Lijfrente of ander aanvullend pensioen (indien van toepassing)' : 'Aanvullend pensioen via SPMS of lijfrente'}/>
           <F label="AOW leeftijd" value={local.aowLeeftijd ?? 67} onChange={set('aowLeeftijd')} suffix="jaar" min={65} max={72}
             help="Instelbaar — overheid kan dit verhogen. Huidig: 67 jaar"/>
           {!isPrive && (
@@ -120,8 +120,9 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
             help={`Streefdoel inclusief hypotheeklast. Na ${jaarHypo} daalt de behoefte automatisch mee.`}/>
           <F label="Comfort — max netto/jaar (€)" value={local.nettoInkomenDoel ?? BASE_PARAMS.nettoInkomenDoel} onChange={set('nettoInkomenDoel')} prefix="€" step={1000}
             help={`Maximum/comfort inclusief hypotheeklast. Na ${jaarHypo} daalt de behoefte automatisch mee. In euro's van nu.`}/>
-          <F label="SPMS / aanvullend pensioen netto/jaar" value={local.jaarlijksNettoSPMS ?? BASE_PARAMS.jaarlijksNettoSPMS} onChange={set('jaarlijksNettoSPMS')} prefix="€" step={250}
-            help={`Vanaf leeftijd ${local.spmsLeeftijd??60} jaar (netto)`}/>
+          <F label={isPrive ? 'Lijfrente / aanvullend pensioen netto/jaar' : 'SPMS / aanvullend pensioen netto/jaar'}
+            value={local.jaarlijksNettoSPMS ?? (isPrive ? 0 : BASE_PARAMS.jaarlijksNettoSPMS)} onChange={set('jaarlijksNettoSPMS')} prefix="€" step={250}
+            help={isPrive ? `Aanvullend netto inkomen vanaf leeftijd ${local.spmsLeeftijd??60} jaar (bijv. lijfrente). Standaard €0.` : `Vanaf leeftijd ${local.spmsLeeftijd??60} jaar (netto)`}/>
           <F label="AOW netto/jaar" value={local.jaarlijksNettoAOW ?? BASE_PARAMS.jaarlijksNettoAOW} onChange={set('jaarlijksNettoAOW')} prefix="€" step={250}
             help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto)`}/>
         </div>
