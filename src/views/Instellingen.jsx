@@ -199,6 +199,32 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
             onChange={v=>set('spaarrentePrive')(v/100)} step={0.05} suffix="%"
             help="Jaarlijkse rente op de privé spaarrekening"/>
         </div>
+
+        {/* Partner */}
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: '1rem' }}>👫 Partner / gezin</div>
+          <div className="form-group">
+            <label className="form-label">Partner toevoegen</label>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              {[{ v: false, l: 'Nee' }, { v: true, l: 'Ja' }].map(({ v, l }) => (
+                <button key={String(v)} type="button"
+                  onClick={() => set('partnerActief')(v)}
+                  style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--r)', border: `1.5px solid ${(local.partnerActief ?? false) === v ? 'var(--accent)' : 'var(--border)'}`, background: (local.partnerActief ?? false) === v ? 'var(--accent-soft)' : 'var(--surface)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}
+                >{l}</button>
+              ))}
+            </div>
+          </div>
+          {(local.partnerActief ?? false) && (
+            <>
+              <F label="Geboortejaar partner" value={local.partnerGeboortejaar ?? 1985} onChange={set('partnerGeboortejaar')} min={1950} max={2005}/>
+              <F label="Pensioenleeftijd partner" value={local.partnerPensioenLeeftijd ?? 55} onChange={set('partnerPensioenLeeftijd')} suffix="jaar" min={40} max={70}/>
+              <F label="Portefeuille partner nu (€)" value={local.partnerPriveNu ?? 0} onChange={set('partnerPriveNu')} prefix="€" step={5000}
+                help="Huidige waarde beleggingsportefeuille partner"/>
+              <F label="Jaarlijkse inleg partner (€)" value={local.partnerInlegPrive ?? 0} onChange={set('partnerInlegPrive')} prefix="€" step={500}
+                help="Gemiddelde jaarlijkse bijdrage van partner"/>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Samenvatting */}

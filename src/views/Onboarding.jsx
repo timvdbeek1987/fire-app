@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BASE_PARAMS } from '../data.js';
+import React, { useState, useEffect } from 'react';
+import { BASE_PARAMS, runMonteCarlo, berekenVeiligPensioenKapitaal, fmt } from '../data.js';
 
 const STAPPEN = ['Profiel', 'Portefeuille', 'Inkomensdoel', 'Inleg', 'Klaar'];
 
@@ -23,6 +23,8 @@ const F = ({ label, value, onChange, type = 'number', help, min, max, step, plac
 
 export default function Onboarding({ user, onComplete }) {
   const [stap, setStap] = useState(0);
+  const [ahaResult,  setAhaResult]  = useState(null);
+  const [ahaLoading, setAhaLoading] = useState(false);
 
   // Stap 1 — Profiel
   const [geboortejaar,      setGeboortejaar]      = useState(1985);
@@ -45,6 +47,30 @@ export default function Onboarding({ user, onComplete }) {
   const isPrive     = userType === 'prive';
   const leeftijd    = CURRENT_YEAR - geboortejaar;
   const pensioenJaar = geboortejaar + pensioenLeeftijd;
+
+  useEffect(() => {
+    if (stap !== 4) return;
+    setAhaLoading(true);
+    const timeout = setTimeout(() => {
+      const p = {
+        ...BASE_PARAMS,
+        geboortejaar,
+        pensioenLeeftijd,
+        nettoInkomenDoel,
+        nettoInkomenVloer,
+        nettoInkomenStreef,
+        inlegJaarlijksBV: isPrive ? 0 : inlegBV,
+        inlegJaarlijksPrive: inlegPrive,
+        ...(isPrive ? { priveModus: true, verplichtDGAsalaris: 0, inlegJaarlijksBV: 0, vennootschapsbelasting: 0, dividendbelasting: 0, inkomstenbelasting: 0, jaarlijksNettoSPMS: 0 } : {}),
+      };
+      const startPort = { bv: isPrive ? 0 : (Number(bvWaarde)||0), prive: Number(priveWaarde)||0, jaar: CURRENT_YEAR, maand: CURRENT_MONTH };
+      const mc = runMonteCarlo(p, startPort, 400);
+      const pkS = berekenVeiligPensioenKapitaal(p, 0, 80, 150);
+      setAhaResult({ mc, pkStreef: pkS });
+      setAhaLoading(false);
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [stap]);
 
   const handleComplete = () => {
     const vandaag = `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2,'0')}-15`;
@@ -291,6 +317,53 @@ export default function Onboarding({ user, onComplete }) {
                 Je profiel is ingesteld. De Monte Carlo engine berekent nu duizenden scenario's
                 voor jouw FIRE-pad. Je kunt alles later aanpassen in Instellingen.
               </p>
+
+              {/* AHA card */}
+              {ahaLoading && (
+                <div style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(37,99,235,0.12), rgba(16,185,129,0.08))', borderRadius: 'var(--r)', border: '1px solid var(--border)', marginBottom: '1.5rem', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--text-3)' }}>
+                  Berekening loopt…
+                </div>
+              )}
+              {!ahaLoading && ahaResult && (() => {
+                const { mc, pkStreef } = ahaResult;
+                const row = mc.years?.find(r => r.leeftijd === pensioenLeeftijd);
+                const priveP50 = row?.priveP50 ?? 0;
+                const kansSucces = mc.kansSucces ?? 0;
+                // FIRE leeftijd: first year where P50 portfolio >= pkStreef
+                let fireLeeftijd = null;
+                let fireJaar = null;
+                if (pkStreef > 0) {
+                  for (const r of (mc.years ?? [])) {
+                    const port = r.totaalP50 ?? r.priveP50 ?? 0;
+                    if (port >= pkStreef) { fireLeeftijd = r.leeftijd; fireJaar = r.jaar; break; }
+                  }
+                }
+                return (
+                  <div style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(37,99,235,0.12), rgba(16,185,129,0.08))', borderRadius: 'var(--r)', border: '1px solid rgba(37,99,235,0.2)', marginBottom: '1.5rem', textAlign: 'left' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '1rem' }}>Jouw FIRE prognose</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-3)', marginBottom: '0.25rem' }}>FIRE leeftijd</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)' }}>
+                          {fireLeeftijd ? `${fireLeeftijd}j (${fireJaar})` : `${pensioenLeeftijd}j (${pensioenJaar})`}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-3)', marginBottom: '0.25rem' }}>Verwacht vermogen op pensioendag</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--green)' }}>
+                          {priveP50 > 0 ? fmt(priveP50) : '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-3)', marginBottom: '0.25rem' }}>Kans van slagen</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
+                          {kansSucces}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="card" style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
                 <div className="card-title" style={{ marginBottom: '1rem' }}>Samenvatting</div>

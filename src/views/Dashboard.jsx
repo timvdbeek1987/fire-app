@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import JaarTick from '../JaarTick.jsx';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { CheckCircle, Clock } from 'lucide-react';
@@ -25,8 +25,9 @@ const ChartTip = ({ active, payload, label }) => {
 export default function Dashboard({
   params, start, mcResult, pensioenKapitaal, pkLoading,
   pkVloer, pkStreef, priveOpPensioendag, countdown, countdownVloer, countdownStreef,
-  birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
+  birthYear = BASE_PARAMS.geboortejaar, userType = 'dga', partnerActief = false,
 }) {
+  const [showCalc, setShowCalc] = useState(false);
   const isPrive = userType === 'prive';
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
@@ -105,14 +106,14 @@ export default function Dashboard({
           <>
             {/* Prive: 4 relevante tegels */}
             <div className="kpi green">
-              <div className="kpi-label">Portefeuille nu</div>
+              <div className="kpi-label">{partnerActief ? 'Gezamenlijk nu' : 'Portefeuille nu'}</div>
               <div className="kpi-value">{fmt(priveNu)}</div>
               <div className="kpi-sub">huidig belegd vermogen</div>
             </div>
             <div className="kpi blue">
               <div className="kpi-label">
                 Verwacht bij pensioen
-                <InfoTip text={`Mediaan (P50) verwachte portefeuillewaarde op leeftijd ${pensioenLeeftijd} jaar, op basis van 2500 Monte Carlo simulaties.`} />
+                <InfoTip text={`Mediaan (P50) verwachte portefeuillewaarde op leeftijd ${pensioenLeeftijd} jaar, op basis van 2500 Monte Carlo simulaties. Berekend door 2500 Monte Carlo simulaties te draaien met jaarlijkse inleg €${(params.inlegJaarlijksPrive ?? 0).toLocaleString()}/jaar en rendement ${((params.meanReturn ?? 0.097)*100).toFixed(1)}%.`} />
               </div>
               <div className="kpi-value">{priveOpPensioendag > 0 ? fmt(priveOpPensioendag) : '—'}</div>
               <div className="kpi-sub">mediaan · leeftijd {pensioenLeeftijd}j</div>
@@ -120,7 +121,7 @@ export default function Dashboard({
             <div className="kpi gold">
               <div className="kpi-label">Jaarlijkse inleg</div>
               <div className="kpi-value">{fmt(params.inlegJaarlijksPrive ?? 0)}</div>
-              <div className="kpi-sub">€{Math.round((params.inlegJaarlijksPrive ?? 0) / 12).toLocaleString()}/mnd gemiddeld</div>
+              <div className="kpi-sub">{partnerActief ? 'gezamenlijke inleg' : `€${Math.round((params.inlegJaarlijksPrive ?? 0) / 12).toLocaleString()}/mnd gemiddeld`}</div>
             </div>
             <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
               <div className="kpi-label">
@@ -362,12 +363,51 @@ export default function Dashboard({
         fontSize: '0.72rem',
         color: 'var(--text-3)',
         lineHeight: 1.7,
+        marginBottom: '1.25rem',
       }}>
         {isPrive
           ? '💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als het minimale privévermogen waarbij 80% van de paden de portefeuille in stand houdt tot leeftijd 85.'
           : '💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als het minimale BV-bedrag waarbij 80% van de paden de BV in stand houdt tot leeftijd 85.'
         }
         {' '}Voeg portefeuille-updates toe via <b>Voortgang</b> om de projectie actueel te houden.
+      </div>
+
+      {/* Berekening-transparantie */}
+      <div className="card">
+        <div
+          onClick={() => setShowCalc(v => !v)}
+          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <div className="card-title" style={{ marginBottom: 0 }}>Hoe werkt de berekening?</div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>{showCalc ? '▲' : '▼'}</span>
+        </div>
+        {showCalc && (
+          <div style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            {[
+              {
+                label: 'Monte Carlo',
+                text: '2500 willekeurige paden, elk met jaarlijkse return uit N(μ, σ). Mediaan (P50) is de middelste uitkomst.',
+              },
+              {
+                label: 'Doelkapitaal (Comfort)',
+                text: `€${pkComfort > 0 ? pkComfort.toLocaleString('nl-NL') : '—'} berekend als minimaal vermogen bij pensioen waarbij 80% van de 250 testpaden de portefeuille in stand houdt tot leeftijd 85.`,
+              },
+              {
+                label: 'Kans succes',
+                text: `${kansSucces}% van 2500 paden heeft nog vermogen op leeftijd 85, met het huidige comfort-doelkapitaal als startpunt voor onttrekkingen.`,
+              },
+              {
+                label: 'Rendementaanname',
+                text: `${(params.meanReturn != null ? params.meanReturn * 100 : 9).toFixed(1)}% nominaal vóór pensioen, ${(params.rendementNaPensioen != null ? params.rendementNaPensioen * 100 : 5).toFixed(1)}% ná pensioen. Inflatie: ${(params.inflatieGemiddeld != null ? params.inflatieGemiddeld * 100 : 2.8).toFixed(1)}%.`,
+              },
+            ].map(({ label, text }) => (
+              <div key={label} style={{ padding: '0.75rem 1rem', borderRadius: 'var(--r)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '0.4rem' }}>{label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)', lineHeight: 1.6 }}>{text}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

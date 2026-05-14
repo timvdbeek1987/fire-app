@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { LayoutDashboard, TrendingUp, LineChart, FlaskConical, Settings, ArrowDownCircle, LogOut } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, LineChart, FlaskConical, Settings, ArrowDownCircle, LogOut, Calculator, Euro } from 'lucide-react';
 import Dashboard    from './views/Dashboard.jsx';
 import Voortgang    from './views/Voortgang.jsx';
 import Projectie    from './views/Projectie.jsx';
@@ -7,6 +7,8 @@ import Scenarios    from './views/Scenarios.jsx';
 import Instellingen from './views/Instellingen.jsx';
 import Onboarding   from './views/Onboarding.jsx';
 import Onttrekking  from './views/Onttrekking.jsx';
+import Planner      from './views/Planner.jsx';
+import Salaris      from './views/Salaris.jsx';
 import {
   BASE_PARAMS, meestRecenteSpaar, getProjectionStart, runMonteCarlo,
   berekenVeiligPensioenKapitaal, berekenVereistKapitaalAnalytisch, fmt,
@@ -24,6 +26,8 @@ const NAV = [
   { id: 'projectie',    label: 'Projectie',    Icon: LineChart        },
   { id: 'onttrekking',  label: 'Onttrekking',  Icon: ArrowDownCircle },
   { id: 'scenarios',    label: "Scenario's",   Icon: FlaskConical     },
+  { id: 'planner',      label: 'Planner',      Icon: Calculator      },
+  { id: 'salaris',      label: 'Salaris',      Icon: Euro            },
   { id: 'instellingen', label: 'Instellingen', Icon: Settings         },
 ];
 
@@ -214,11 +218,23 @@ export default function App() {
 
   const birthYear = effectiveParams.geboortejaar ?? BIRTH_YEAR;
 
+  const partnerActief = effectiveParams.partnerActief ?? false;
+
   // Start of simulation
   const start = useMemo(() => {
     const s = getProjectionStart(vermogenUpdates);
     return { ...s, bvSpaar: 0, priveSpaar: 0, ...meestRecenteSpaar(vermogenUpdates) };
   }, [vermogenUpdates]);
+
+  const mcStart = useMemo(() => {
+    if (!partnerActief) return start;
+    return { ...start, prive: (start.prive ?? 0) + (effectiveParams.partnerPriveNu ?? 0) };
+  }, [start, partnerActief, effectiveParams.partnerPriveNu]);
+
+  const mcParams = useMemo(() => {
+    if (!partnerActief) return effectiveParams;
+    return { ...effectiveParams, inlegJaarlijksPrive: (effectiveParams.inlegJaarlijksPrive ?? 0) + (effectiveParams.partnerInlegPrive ?? 0) };
+  }, [effectiveParams, partnerActief]);
 
   // Privé at pension day (for pk calculation)
   const priveOpPensioendag = useMemo(() => {
@@ -230,21 +246,21 @@ export default function App() {
 
   // Run Monte Carlo when start or params change
   const mcDeps = JSON.stringify({
-    bv:    start.bv,
-    prive: start.prive,
-    jaar:  start.jaar,
-    maand: start.maand,
-    p:     effectiveParams.pensioenLeeftijd,
-    r:     effectiveParams.meanReturn,
-    i:     effectiveParams.inlegJaarlijksBV,
-    ip:    effectiveParams.inlegJaarlijksPrive,
+    bv:    mcStart.bv,
+    prive: mcStart.prive,
+    jaar:  mcStart.jaar,
+    maand: mcStart.maand,
+    p:     mcParams.pensioenLeeftijd,
+    r:     mcParams.meanReturn,
+    i:     mcParams.inlegJaarlijksBV,
+    ip:    mcParams.inlegJaarlijksPrive,
   });
 
   useEffect(() => {
     if (!start.jaar) return;
     setMcRunning(true);
     const t = setTimeout(() => {
-      const result = runMonteCarlo(effectiveParams, start, 2500);
+      const result = runMonteCarlo(mcParams, mcStart, 2500);
       setMcResult(result);
       setMcRunning(false);
     }, 50);
@@ -265,7 +281,7 @@ export default function App() {
     if (!mcResult) return;
     setPkLoading(true);
     const t = setTimeout(() => {
-      const pk = berekenVeiligPensioenKapitaal(effectiveParams, priveOpPensioendag, 80, 250);
+      const pk = berekenVeiligPensioenKapitaal(mcParams, priveOpPensioendag, 80, 250);
       setPkResult(pk);
       setPkLoading(false);
     }, 100);
@@ -275,8 +291,8 @@ export default function App() {
   // Floor pk (nettoInkomenVloer)
   useEffect(() => {
     if (!mcResult) return;
-    const vloerInkomen = effectiveParams.nettoInkomenVloer ?? BASE_PARAMS.nettoInkomenVloer;
-    const paramsVloer  = { ...effectiveParams, nettoInkomenDoel: vloerInkomen };
+    const vloerInkomen = mcParams.nettoInkomenVloer ?? BASE_PARAMS.nettoInkomenVloer;
+    const paramsVloer  = { ...mcParams, nettoInkomenDoel: vloerInkomen };
     const t = setTimeout(() => {
       setPkVloer(berekenVeiligPensioenKapitaal(paramsVloer, priveOpPensioendag, 80, 250));
     }, 150);
@@ -286,8 +302,8 @@ export default function App() {
   // Streef pk
   useEffect(() => {
     if (!mcResult) return;
-    const streefInkomen = effectiveParams.nettoInkomenStreef ?? BASE_PARAMS.nettoInkomenStreef;
-    const paramsStreef  = { ...effectiveParams, nettoInkomenDoel: streefInkomen };
+    const streefInkomen = mcParams.nettoInkomenStreef ?? BASE_PARAMS.nettoInkomenStreef;
+    const paramsStreef  = { ...mcParams, nettoInkomenDoel: streefInkomen };
     const t = setTimeout(() => {
       setPkStreef(berekenVeiligPensioenKapitaal(paramsStreef, priveOpPensioendag, 80, 250));
     }, 200);
@@ -327,19 +343,19 @@ export default function App() {
   }, [mcResult, birthYear]);
 
   const countdown = useMemo(
-    () => makeCountdown(effectiveParams, pkResult),
-    [makeCountdown, effectiveParams, pkResult]
+    () => makeCountdown(mcParams, pkResult),
+    [makeCountdown, mcParams, pkResult]
   );
 
   const countdownVloer = useMemo(() => {
-    const vloerInkomen = effectiveParams.nettoInkomenVloer ?? BASE_PARAMS.nettoInkomenVloer;
-    return makeCountdown({ ...effectiveParams, nettoInkomenDoel: vloerInkomen }, pkVloer);
-  }, [makeCountdown, effectiveParams, pkVloer]);
+    const vloerInkomen = mcParams.nettoInkomenVloer ?? BASE_PARAMS.nettoInkomenVloer;
+    return makeCountdown({ ...mcParams, nettoInkomenDoel: vloerInkomen }, pkVloer);
+  }, [makeCountdown, mcParams, pkVloer]);
 
   const countdownStreef = useMemo(() => {
-    const streefInkomen = effectiveParams.nettoInkomenStreef ?? BASE_PARAMS.nettoInkomenStreef;
-    return makeCountdown({ ...effectiveParams, nettoInkomenDoel: streefInkomen }, pkStreef);
-  }, [makeCountdown, effectiveParams, pkStreef]);
+    const streefInkomen = mcParams.nettoInkomenStreef ?? BASE_PARAMS.nettoInkomenStreef;
+    return makeCountdown({ ...mcParams, nettoInkomenDoel: streefInkomen }, pkStreef);
+  }, [makeCountdown, mcParams, pkStreef]);
 
   // Save params to Supabase
   const saveParams = useCallback(async (newParams) => {
@@ -428,6 +444,7 @@ export default function App() {
     birthYear,
     vermogenUpdates,
     userType,
+    partnerActief,
     onParamsChange: saveParams,
     onVoortgangUpdate: saveVoortgangUpdate,
   };
@@ -439,6 +456,8 @@ export default function App() {
       case 'projectie':    return <Projectie    {...sharedProps} />;
       case 'onttrekking':  return <Onttrekking  {...sharedProps} />;
       case 'scenarios':    return <Scenarios    {...sharedProps} />;
+      case 'planner':      return <Planner      {...sharedProps} />;
+      case 'salaris':      return <Salaris />;
       case 'instellingen': return <Instellingen {...sharedProps} />;
       default:             return <Dashboard    {...sharedProps} />;
     }
