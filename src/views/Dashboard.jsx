@@ -62,17 +62,21 @@ export default function Dashboard({
 
   // Progressie naar doel (comfort)
   const doelKapitaal = pensioenKapitaal ?? 0;
-  const progressPct  = doelKapitaal > 0
-    ? Math.min(100, Math.round(totaalNu / doelKapitaal * 100))
+  const pkVloerVal   = pkVloer  ?? 0;
+  const pkStreefVal  = pkStreef  ?? 0;
+  const pkComfort    = doelKapitaal;
+
+  // Prive: vergelijk verwachte waarde op pensioendag (zelfde nominale euros als pkComfort)
+  // DGA:  vergelijk huidige waarde (minder zinvol maar consistenter met huidige logica)
+  const progressRef = isPrive ? priveOpPensioendag : totaalNu;
+  const progressPct = pkComfort > 0
+    ? Math.min(100, Math.round(progressRef / pkComfort * 100))
     : 0;
 
-  const pkVloerVal  = pkVloer  ?? 0;
-  const pkStreefVal = pkStreef  ?? 0;
-  const pkComfort   = doelKapitaal;
-  const refMax      = pkComfort > 0 ? pkComfort * 1.05 : 1;
-  const floorPct    = pkVloerVal  > 0 ? Math.min(100, pkVloerVal  / refMax * 100) : 0;
-  const streefPct   = pkStreefVal > 0 ? Math.min(100, pkStreefVal  / refMax * 100) : 0;
-  const fillPct     = pkComfort   > 0 ? Math.min(100, totaalNu    / refMax * 100) : 0;
+  const refMax    = pkComfort > 0 ? pkComfort * 1.05 : 1;
+  const floorPct  = pkVloerVal > 0 ? Math.min(100, pkVloerVal / refMax * 100) : 0;
+  const streefPct = pkStreefVal > 0 ? Math.min(100, pkStreefVal / refMax * 100) : 0;
+  const fillPct   = pkComfort  > 0 ? Math.min(100, progressRef / refMax * 100) : 0;
 
   const kansSucces = mcResult?.kansSucces ?? 0;
 
@@ -225,7 +229,9 @@ export default function Dashboard({
             <div>
               <div className="card-title">Voortgang naar doel</div>
               <div className="card-subtitle">
-                {fmt(totaalNu)} van {fmt(pkComfort)} comfort-doelkapitaal
+                {isPrive
+                  ? `Verwacht op pensioen: ${fmt(priveOpPensioendag)} van ${fmt(pkComfort)}`
+                  : `${fmt(totaalNu)} van ${fmt(pkComfort)} comfort-doelkapitaal`}
               </div>
             </div>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600 }}>{progressPct}%</span>
@@ -282,10 +288,17 @@ export default function Dashboard({
               <div style={{ color: 'var(--text-3)' }}>Geplande pensioenleeftijd</div>
               <div style={{ fontWeight: 600 }}>{pensioenLeeftijd} jaar ({pensioenJaar})</div>
             </div>
-            <div>
-              <div style={{ color: 'var(--text-3)' }}>Nog te sparen</div>
-              <div style={{ fontWeight: 600 }}>{fmt(Math.max(0, pkComfort - totaalNu))}</div>
-            </div>
+            {isPrive ? (
+              <div>
+                <div style={{ color: 'var(--text-3)' }}>Nu al belegd</div>
+                <div style={{ fontWeight: 600 }}>{fmt(priveNu)}</div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ color: 'var(--text-3)' }}>Nog te sparen</div>
+                <div style={{ fontWeight: 600 }}>{fmt(Math.max(0, pkComfort - totaalNu))}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -233,6 +233,7 @@ export default function App() {
     p:     effectiveParams.pensioenLeeftijd,
     r:     effectiveParams.meanReturn,
     i:     effectiveParams.inlegJaarlijksBV,
+    ip:    effectiveParams.inlegJaarlijksPrive,
   });
 
   useEffect(() => {
