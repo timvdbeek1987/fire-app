@@ -12,7 +12,7 @@ import Salaris      from './views/Salaris.jsx';
 import {
   BASE_PARAMS, meestRecenteSpaar, getProjectionStart, runMonteCarlo,
   berekenVeiligPensioenKapitaal, berekenVereistKapitaalAnalytisch, fmt,
-  berekenGemiddeldeInflatieCBS, BIRTH_YEAR,
+  berekenGemiddeldeInflatieCBS, berekenMaandelijksOnttrektbaar, BIRTH_YEAR,
 } from './data.js';
 import {
   supabase, supabaseEnabled, onAuthStateChange, signInWithMagicLink, signOut,
@@ -244,6 +244,14 @@ export default function App() {
     return row?.priveP50 ?? 0;
   }, [mcResult, effectiveParams.pensioenLeeftijd]);
 
+  // Totaal P50 op pensioendag (DGA: BV + privé)
+  const totaalOpPensioendag = useMemo(() => {
+    if (!mcResult?.years?.length) return 0;
+    const pensioenLft = effectiveParams.pensioenLeeftijd ?? 55;
+    const row = mcResult.years.find(r => r.leeftijd === pensioenLft);
+    return row?.totaalP50 ?? 0;
+  }, [mcResult, effectiveParams.pensioenLeeftijd]);
+
   // Run Monte Carlo when start or params change
   const mcDeps = JSON.stringify({
     bv:    mcStart.bv,
@@ -398,6 +406,16 @@ export default function App() {
     }
   }, [user, saveParams]);
 
+  // Maandelijkse onttrekking (annuïteit)
+  const maandelijksOnttrektbaar = useMemo(() => {
+    const isPrive = (profile?.user_type ?? 'dga') === 'prive';
+    const portfolio = isPrive ? priveOpPensioendag : totaalOpPensioendag;
+    if (!portfolio) return 0;
+    const pensioenLft = effectiveParams.pensioenLeeftijd ?? 55;
+    const jaarTotPensioen = Math.max(0, pensioenLft - (new Date().getFullYear() - birthYear));
+    return berekenMaandelijksOnttrektbaar(mcParams, portfolio, jaarTotPensioen);
+  }, [mcParams, priveOpPensioendag, totaalOpPensioendag, effectiveParams.pensioenLeeftijd, birthYear, profile?.user_type]);
+
   // ── Loading state ────────────────────────────────────────
   if (user === undefined) {
     return (
@@ -438,6 +456,8 @@ export default function App() {
     pkVloer,
     pkStreef,
     priveOpPensioendag,
+    totaalOpPensioendag,
+    maandelijksOnttrektbaar,
     countdown,
     countdownVloer,
     countdownStreef,

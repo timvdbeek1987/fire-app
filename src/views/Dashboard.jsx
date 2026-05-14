@@ -24,7 +24,8 @@ const ChartTip = ({ active, payload, label }) => {
 
 export default function Dashboard({
   params, start, mcResult, pensioenKapitaal, pkLoading,
-  pkVloer, pkStreef, priveOpPensioendag, countdown, countdownVloer, countdownStreef,
+  pkVloer, pkStreef, priveOpPensioendag, totaalOpPensioendag, maandelijksOnttrektbaar,
+  countdown, countdownVloer, countdownStreef,
   birthYear = BASE_PARAMS.geboortejaar, userType = 'dga', partnerActief = false,
 }) {
   const [showCalc, setShowCalc] = useState(false);
@@ -165,6 +166,40 @@ export default function Dashboard({
           </>
         )}
       </div>
+
+      {/* Maandelijkse onttrekking */}
+      {maandelijksOnttrektbaar > 0 && (
+        <div className="card" style={{ marginBottom: '1.25rem', borderTop: '3px solid var(--green)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.25rem' }}>
+                Maandelijkse onttrekking (P50)
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)', lineHeight: 1 }}>
+                €{maandelijksOnttrektbaar.toLocaleString('nl-NL')}
+                <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd</span>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-4)', marginTop: '0.3rem' }}>
+                excl. AOW / pensioen · portefeuille €0 op leeftijd {params.uitputtingsLeeftijd ?? 90}j
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', minWidth: 240 }}>
+              <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portefeuille op pensioendag</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                  {fmt(isPrive ? priveOpPensioendag : totaalOpPensioendag)}
+                </div>
+              </div>
+              <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Onttrekkingsperiode</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                  {(params.uitputtingsLeeftijd ?? 90) - (params.pensioenLeeftijd ?? 55)}j
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Countdown tegel + Progressie */}
       <div className="grid-2" style={{ marginBottom: '1.25rem' }}>

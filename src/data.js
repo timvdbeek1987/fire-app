@@ -87,6 +87,7 @@ export const BASE_PARAMS = {
   inkomstenReductiePct:       0.20,
   spaarrenteBV:               0.025,
   spaarrentePrive:            0.025,
+  uitputtingsLeeftijd:        90,
 };
 
 // ============================================================
@@ -874,4 +875,35 @@ export function runHistorischScenario(
   };
 
   return runSinglePath(p, start, null, stressRandNorm, null);
+}
+
+// ============================================================
+// MAANDELIJKSE ONTTREKKING — annuïteit tot uitputtingsleeftijd
+// portfolioNominaalPensioen: P50 portefeuillewaarde op pensioendatum (nominaal)
+// jaarTotPensioen: jaren vanaf nu tot pensionering (voor inflatie-deflatie)
+// Retourneert: maandelijks onttrektbaar bedrag in huidig (reëel) geld
+// ============================================================
+export function berekenMaandelijksOnttrektbaar(params, portfolioNominaalPensioen, jaarTotPensioen) {
+  const p = { ...BASE_PARAMS, ...params };
+  const pensioenLft   = p.pensioenLeeftijd    ?? 55;
+  const uitputtingLft = p.uitputtingsLeeftijd ?? 90;
+  const nMaanden = Math.max(12, (uitputtingLft - pensioenLft) * 12);
+
+  const rNominaalJaar = p.rendementNaPensioen ?? 0.05;
+  const vrh           = p.vermogensrendementsheffing ?? 0.02088;
+  const inflatie      = p.inflatieGemiddeld ?? 0.02;
+
+  const cumulInflatie  = Math.pow(1 + inflatie, Math.max(0, jaarTotPensioen));
+  const portfolioReeel = portfolioNominaalPensioen / cumulInflatie;
+
+  const rNettoJaar = (1 + rNominaalJaar - vrh) / (1 + inflatie) - 1;
+  const rMaand     = Math.pow(1 + Math.max(-0.5, rNettoJaar), 1 / 12) - 1;
+
+  if (portfolioReeel <= 0) return 0;
+
+  const pmt = Math.abs(rMaand) < 0.000001
+    ? portfolioReeel / nMaanden
+    : portfolioReeel * rMaand / (1 - Math.pow(1 + rMaand, -nMaanden));
+
+  return Math.max(0, Math.round(pmt));
 }

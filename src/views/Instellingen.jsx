@@ -67,6 +67,8 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
             help="Leeftijd waarop aanvullend pensioen of lijfrente ingaat"/>
           <F label="AOW leeftijd" value={local.aowLeeftijd ?? 67} onChange={set('aowLeeftijd')} suffix="jaar" min={65} max={72}
             help="Instelbaar — overheid kan dit verhogen. Huidig: 67 jaar"/>
+          <F label="Uitputtingsleeftijd" value={local.uitputtingsLeeftijd ?? 90} onChange={set('uitputtingsLeeftijd')} suffix="jaar" min={70} max={110}
+            help="Leeftijd waarop portefeuille op nul staat — gebruikt voor de maandelijkse onttrekkingstegel"/>
           {!isPrive && (
             <F label="Jaarlijkse inleg BV" value={local.inlegJaarlijksBV ?? BASE_PARAMS.inlegJaarlijksBV} onChange={set('inlegJaarlijksBV')} prefix="€" step={1000}
               help="Gemiddeld per jaar tijdens opbouwfase"/>
