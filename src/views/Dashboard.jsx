@@ -96,39 +96,69 @@ export default function Dashboard({
       </div>
 
       {/* KPI rij */}
-      <div className={isPrive ? 'grid-3' : 'grid-4'} style={{ marginBottom: '1.25rem' }}>
-        {!isPrive && (
-          <div className="kpi blue">
-            <div className="kpi-label">BV Portefeuille</div>
-            <div className="kpi-value">{fmt(bvNu)}</div>
-            <div className="kpi-sub">beleggingsrekening</div>
-          </div>
+      <div className="grid-4" style={{ marginBottom: '1.25rem' }}>
+        {isPrive ? (
+          <>
+            {/* Prive: 4 relevante tegels */}
+            <div className="kpi green">
+              <div className="kpi-label">Portefeuille nu</div>
+              <div className="kpi-value">{fmt(priveNu)}</div>
+              <div className="kpi-sub">huidig belegd vermogen</div>
+            </div>
+            <div className="kpi blue">
+              <div className="kpi-label">
+                Verwacht bij pensioen
+                <InfoTip text={`Mediaan (P50) verwachte portefeuillewaarde op leeftijd ${pensioenLeeftijd} jaar, op basis van 2500 Monte Carlo simulaties.`} />
+              </div>
+              <div className="kpi-value">{priveOpPensioendag > 0 ? fmt(priveOpPensioendag) : '—'}</div>
+              <div className="kpi-sub">mediaan · leeftijd {pensioenLeeftijd}j</div>
+            </div>
+            <div className="kpi gold">
+              <div className="kpi-label">Jaarlijkse inleg</div>
+              <div className="kpi-value">{fmt(params.inlegJaarlijksPrive ?? 0)}</div>
+              <div className="kpi-sub">€{Math.round((params.inlegJaarlijksPrive ?? 0) / 12).toLocaleString()}/mnd gemiddeld</div>
+            </div>
+            <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
+              <div className="kpi-label">
+                Kans succes
+                <InfoTip text="% simulaties waarbij je portefeuille > 0 is op leeftijd 85 (2500 Monte Carlo paden)." />
+              </div>
+              <div className="kpi-value" style={{ color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
+                {kansSucces}%
+              </div>
+              <div className="kpi-sub">bij comfort-doelvermogen</div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* DGA: originele 4 tegels */}
+            <div className="kpi blue">
+              <div className="kpi-label">BV Portefeuille</div>
+              <div className="kpi-value">{fmt(bvNu)}</div>
+              <div className="kpi-sub">beleggingsrekening</div>
+            </div>
+            <div className="kpi green">
+              <div className="kpi-label">Privé Portefeuille</div>
+              <div className="kpi-value">{fmt(priveNu)}</div>
+              <div className="kpi-sub">box 3 beleggen</div>
+            </div>
+            <div className="kpi gold">
+              <div className="kpi-label">Totaal Vermogen</div>
+              <div className="kpi-value">{fmt(totaalNu)}</div>
+              <div className="kpi-sub">BV + privé gecombineerd</div>
+            </div>
+            <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
+              <div className="kpi-label">
+                Kans succes
+                <InfoTip text="% simulaties waarbij BV > 0 op leeftijd 85 (2500 Monte Carlo paden, 80e percentiel veiligheidsgrens)." />
+              </div>
+              <div className="kpi-value" style={{ color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
+                {kansSucces}%
+              </div>
+              <div className="kpi-sub">bij comfort-doelvermogen</div>
+            </div>
+          </>
         )}
-        <div className="kpi green">
-          <div className="kpi-label">{isPrive ? 'Portefeuille' : 'Privé Portefeuille'}</div>
-          <div className="kpi-value">{fmt(priveNu)}</div>
-          <div className="kpi-sub">{isPrive ? 'beleggingsrekening' : 'box 3 beleggen'}</div>
-        </div>
-        {!isPrive && (
-          <div className="kpi gold">
-            <div className="kpi-label">Totaal Vermogen</div>
-            <div className="kpi-value">{fmt(totaalNu)}</div>
-            <div className="kpi-sub">BV + privé gecombineerd</div>
-          </div>
-        )}
-        <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
-          <div className="kpi-label">
-            Kans succes
-            <InfoTip text={isPrive
-              ? '% simulaties waarbij je portefeuille > 0 is op leeftijd 85 (2500 Monte Carlo paden).'
-              : '% simulaties waarbij BV > 0 op leeftijd 85 (2500 Monte Carlo paden, 80e percentiel veiligheidsgrens).'}
-            />
-          </div>
-          <div className="kpi-value" style={{ color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
-            {kansSucces}%
-          </div>
-          <div className="kpi-sub">bij comfort-doelvermogen</div>
-        </div>
       </div>
 
       {/* Countdown tegel + Progressie */}
