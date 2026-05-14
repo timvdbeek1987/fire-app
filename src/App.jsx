@@ -206,6 +206,7 @@ export default function App() {
         vennootschapsbelasting: 0,
         dividendbelasting:      0,
         inkomstenbelasting:     0,
+        jaarlijksNettoSPMS:     0, // geen SPMS voor privé; instelbaar via Instellingen
         priveModus:             true,
       } : {}),
     };
