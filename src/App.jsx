@@ -237,18 +237,21 @@ export default function App() {
   }, [effectiveParams, partnerActief]);
 
   // Privé at pension day (for pk calculation)
+  // Gebruik leeftijd-1 (laatste opbouwjaar) zodat we de waarde VOOR de eerste onttrekking tonen
   const priveOpPensioendag = useMemo(() => {
     if (!mcResult?.years?.length) return 0;
     const pensioenLft = effectiveParams.pensioenLeeftijd ?? 55;
-    const row = mcResult.years.find(r => r.leeftijd === pensioenLft);
+    const row = mcResult.years.find(r => r.leeftijd === pensioenLft - 1)
+             ?? mcResult.years.find(r => r.leeftijd === pensioenLft);
     return row?.priveP50 ?? 0;
   }, [mcResult, effectiveParams.pensioenLeeftijd]);
 
-  // Totaal P50 op pensioendag (DGA: BV + privé)
+  // Totaal P50 op pensioendag (DGA: BV + privé), ook laatste opbouwjaar
   const totaalOpPensioendag = useMemo(() => {
     if (!mcResult?.years?.length) return 0;
     const pensioenLft = effectiveParams.pensioenLeeftijd ?? 55;
-    const row = mcResult.years.find(r => r.leeftijd === pensioenLft);
+    const row = mcResult.years.find(r => r.leeftijd === pensioenLft - 1)
+             ?? mcResult.years.find(r => r.leeftijd === pensioenLft);
     return row?.totaalP50 ?? 0;
   }, [mcResult, effectiveParams.pensioenLeeftijd]);
 
