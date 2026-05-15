@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_PARAMS, runMonteCarlo, berekenVeiligPensioenKapitaal, fmt } from '../data.js';
 
-const STAPPEN = ['Profiel', 'Portefeuille', 'Inkomensdoel', 'Woonlasten', 'Inleg', 'Klaar'];
+const STAPPEN = ['Profiel', 'Portefeuille', 'Inkomensdoel', 'Woonlasten', 'Inkomen', 'Inleg', 'Klaar'];
 
 const CURRENT_YEAR  = new Date().getFullYear();
 const CURRENT_MONTH = new Date().getMonth() + 1;
 
-// F buiten de component — anders verlies je focus na elke toetsaanslag
-const F = ({ label, value, onChange, type = 'number', help, min, max, step, placeholder, suffix }) => (
+const F = ({ label, value, onChange, type = 'number', help, min, max, step, placeholder, suffix, prefix }) => (
   <div className="form-group">
     <label className="form-label">{label}</label>
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      {prefix && <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>{prefix}</span>}
       <input
         type={type} className="form-input"
         value={value}
@@ -25,7 +25,6 @@ const F = ({ label, value, onChange, type = 'number', help, min, max, step, plac
   </div>
 );
 
-// Compact row for cost estimates
 const KostenRij = ({ label, value, onChange, step = 25 }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', flex: 1 }}>{label}</span>
@@ -41,15 +40,41 @@ const KostenRij = ({ label, value, onChange, step = 25 }) => (
   </div>
 );
 
+const Toggle = ({ value, onChange, options }) => (
+  <div style={{ display: 'flex', gap: '0.5rem' }}>
+    {options.map(o => (
+      <button key={String(o.v)} type="button"
+        onClick={() => onChange(o.v)}
+        style={{
+          flex: 1, padding: '0.5rem', borderRadius: 'var(--r)',
+          border: `1.5px solid ${value === o.v ? 'var(--accent)' : 'var(--border)'}`,
+          background: value === o.v ? 'var(--accent-soft)' : 'var(--surface)',
+          cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.78rem',
+          fontWeight: value === o.v ? 600 : 400,
+        }}
+      >{o.l}</button>
+    ))}
+  </div>
+);
+
+const Sectie = ({ titel, kleur = 'var(--text-3)', children }) => (
+  <div style={{ marginBottom: '1.5rem' }}>
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: kleur, marginBottom: '0.75rem' }}>
+      {titel}
+    </div>
+    {children}
+  </div>
+);
+
 export default function Onboarding({ user, onComplete }) {
   const [stap, setStap] = useState(0);
   const [ahaResult,  setAhaResult]  = useState(null);
   const [ahaLoading, setAhaLoading] = useState(false);
 
   // Stap 0 — Profiel
-  const [geboortejaar,      setGeboortejaar]      = useState(1985);
-  const [pensioenLeeftijd,  setPensioenLeeftijd]  = useState(55);
-  const [userType,          setUserType]          = useState('prive');
+  const [geboortejaar,     setGeboortejaar]     = useState(1985);
+  const [pensioenLeeftijd, setPensioenLeeftijd] = useState(55);
+  const [userType,         setUserType]         = useState('prive');
 
   // Stap 1 — Portefeuille
   const [bvWaarde,    setBvWaarde]    = useState('');
@@ -61,50 +86,57 @@ export default function Onboarding({ user, onComplete }) {
   const [nettoInkomenStreef, setNettoInkomenStreef]  = useState(42000);
 
   // Stap 3 — Woonlasten & leefkosten
-  const [huidigInkomen,    setHuidigInkomen]    = useState(5000);
-  const [woningType,       setWoningType]       = useState('hypotheek'); // 'hypotheek' | 'huur'
-  const [woningLast,       setWoningLast]       = useState(1200);
-  const [hypotheekJaren,   setHypotheekJaren]   = useState(20);
-  const [energie,          setEnergie]          = useState(175);
-  const [verzekering,      setVerzekering]      = useState(275);
-  const [abonnementen,     setAbonnementen]     = useState(100);
-  const [boodschappen,     setBoodschappen]     = useState(600);
-  const [uiteten,          setUiteten]          = useState(250);
-  const [transport,        setTransport]        = useState(200);
-  const [vakantie,         setVakantie]         = useState(200);
-  const [kleding,          setKleding]          = useState(100);
-  const [overig,           setOverig]           = useState(150);
+  const [huidigInkomen,  setHuidigInkomen]  = useState(5000);
+  const [woningType,     setWoningType]     = useState('hypotheek');
+  const [woningLast,     setWoningLast]     = useState(1200);
+  const [hypotheekJaren, setHypotheekJaren] = useState(20);
+  const [hypotheekRestschuld, setHypotheekRestschuld] = useState(150000);
+  const [energie,        setEnergie]        = useState(175);
+  const [verzekering,    setVerzekering]    = useState(275);
+  const [abonnementen,   setAbonnementen]   = useState(100);
+  const [boodschappen,   setBoodschappen]   = useState(600);
+  const [uiteten,        setUiteten]        = useState(250);
+  const [transport,      setTransport]      = useState(200);
+  const [vakantie,       setVakantie]       = useState(200);
+  const [kleding,        setKleding]        = useState(100);
+  const [overig,         setOverig]         = useState(150);
 
-  // Stap 4 — Inleg
-  const [inlegBV,     setInlegBV]     = useState(60000);
-  const [inlegPrive,  setInlegPrive]  = useState(500);
+  // Stap 4 — Inkomen & DGA
+  const [aowLeeftijd,            setAowLeeftijd]            = useState(67);
+  const [jaarlijksNettoAOW,      setJaarlijksNettoAOW]      = useState(16680);
+  const [heeftPensioen,          setHeeftPensioen]          = useState(false);
+  const [spmsLeeftijd,           setSpmsLeeftijd]           = useState(60);
+  const [jaarlijksNettoSPMS,     setJaarlijksNettoSPMS]     = useState(10000);
+  const [verplichtDGASalaris,    setVerplichtDGASalaris]    = useState(20000);
+  const [hypotheekAflosMethode,  setHypotheekAflosMethode]  = useState('bank');
+  const [hypotheekHerfinRente,   setHypotheekHerfinRente]   = useState(4.5);
+  const [partnerActief,          setPartnerActief]          = useState(false);
+  const [partnerGeboortejaar,    setPartnerGeboortejaar]    = useState(1985);
+  const [partnerPensioenLft,     setPartnerPensioenLft]     = useState(55);
+  const [partnerPriveNu,         setPartnerPriveNu]         = useState(0);
+  const [partnerInlegPrive,      setPartnerInlegPrive]      = useState(0);
+
+  // Stap 5 — Inleg
+  const [inlegBV,    setInlegBV]    = useState(60000);
+  const [inlegPrive, setInlegPrive] = useState(500);
 
   const isPrive     = userType === 'prive';
   const leeftijd    = CURRENT_YEAR - geboortejaar;
   const pensioenJaar = geboortejaar + pensioenLeeftijd;
+  const jaarHypotheekvrij = woningType === 'hypotheek' ? CURRENT_YEAR + hypotheekJaren : 9999;
 
-  const totaalWoonlasten = woningLast + energie + verzekering + abonnementen;
-  const totaalVariabel   = boodschappen + uiteten + transport + vakantie + kleding + overig;
-  const totaalUitgaven   = totaalWoonlasten + totaalVariabel;
+  const totaalWoonlasten   = woningLast + energie + verzekering + abonnementen;
+  const totaalVariabel     = boodschappen + uiteten + transport + vakantie + kleding + overig;
+  const totaalUitgaven     = totaalWoonlasten + totaalVariabel;
   const beschikbaarVoorInleg = Math.max(0, huidigInkomen - totaalUitgaven);
 
   useEffect(() => {
-    if (stap !== 5) return;
+    if (stap !== 6) return;
     setAhaLoading(true);
     const timeout = setTimeout(() => {
-      const p = {
-        ...BASE_PARAMS,
-        geboortejaar,
-        pensioenLeeftijd,
-        nettoInkomenDoel,
-        nettoInkomenVloer,
-        nettoInkomenStreef,
-        inlegJaarlijksBV: isPrive ? 0 : inlegBV,
-        inlegJaarlijksPrive: inlegPrive,
-        ...(isPrive ? { priveModus: true, verplichtDGAsalaris: 0, inlegJaarlijksBV: 0, vennootschapsbelasting: 0, dividendbelasting: 0, inkomstenbelasting: 0, jaarlijksNettoSPMS: 0 } : {}),
-      };
+      const p = buildParams();
       const startPort = { bv: isPrive ? 0 : (Number(bvWaarde)||0), prive: Number(priveWaarde)||0, jaar: CURRENT_YEAR, maand: CURRENT_MONTH };
-      const mc = runMonteCarlo(p, startPort, 400);
+      const mc  = runMonteCarlo(p, startPort, 400);
       const pkS = berekenVeiligPensioenKapitaal(p, 0, 80, 150);
       setAhaResult({ mc, pkStreef: pkS });
       setAhaLoading(false);
@@ -112,39 +144,63 @@ export default function Onboarding({ user, onComplete }) {
     return () => clearTimeout(timeout);
   }, [stap]);
 
+  const buildParams = () => ({
+    ...BASE_PARAMS,
+    geboortejaar,
+    pensioenLeeftijd,
+    nettoInkomenDoel,
+    nettoInkomenVloer,
+    nettoInkomenStreef,
+    inlegJaarlijksBV:    isPrive ? 0 : inlegBV,
+    inlegJaarlijksPrive: inlegPrive,
+    // AOW & pensioen
+    aowLeeftijd,
+    jaarlijksNettoAOW,
+    spmsLeeftijd,
+    jaarlijksNettoSPMS: heeftPensioen ? jaarlijksNettoSPMS : 0,
+    // Hypotheek
+    maandelijkseHypotheeklast: woningType === 'hypotheek' ? woningLast : 0,
+    jaarHypotheekvrij,
+    hypotheekAflosJaar:    woningType === 'hypotheek' ? jaarHypotheekvrij : 9999,
+    hypotheekAflosMethode: woningType === 'hypotheek' ? hypotheekAflosMethode : 'bank',
+    hypotheekHerfinRente,
+    hypotheekRestschuld:   woningType === 'hypotheek' ? hypotheekRestschuld : 0,
+    // DGA
+    verplichtDGAsalaris: isPrive ? 0 : verplichtDGASalaris,
+    ...(isPrive ? {
+      priveModus: true, inlegJaarlijksBV: 0,
+      vennootschapsbelasting: 0, dividendbelasting: 0,
+      inkomstenbelasting: 0, jaarlijksNettoSPMS: 0,
+    } : {}),
+    // Partner
+    partnerActief,
+    ...(partnerActief ? {
+      partnerGeboortejaar,
+      partnerPensioenLeeftijd: partnerPensioenLft,
+      partnerPriveNu,
+      partnerInlegPrive,
+    } : {}),
+    // Budget
+    budget: {
+      inkomen: huidigInkomen,
+      hypotheek: woningLast,
+      energie, verzekering, abonnementen,
+      boodschappen, uiteten, transport, vakantie, kleding, overig,
+      woningType,
+      ...(woningType === 'hypotheek' ? { hypotheekJarenResterend: hypotheekJaren } : {}),
+    },
+  });
+
   const handleComplete = () => {
     const vandaag = `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2,'0')}-15`;
+    const p = buildParams();
     onComplete({
       profile: {
         geboortejaar,
         pensioen_leeftijd: pensioenLeeftijd,
         user_type: userType,
       },
-      params: {
-        geboortejaar,
-        pensioenLeeftijd,
-        nettoInkomenDoel,
-        nettoInkomenVloer,
-        nettoInkomenStreef,
-        inlegJaarlijksBV:    isPrive ? 0 : inlegBV,
-        inlegJaarlijksPrive: inlegPrive,
-        budget: {
-          inkomen:      huidigInkomen,
-          hypotheek:    woningLast,
-          energie,
-          verzekering,
-          abonnementen,
-          boodschappen,
-          uiteten,
-          transport,
-          vakantie,
-          kleding,
-          overig,
-          // meta
-          woningType,
-          ...(woningType === 'hypotheek' ? { hypotheekJarenResterend: hypotheekJaren } : {}),
-        },
-      },
+      params: p,
       portfolioStart: {
         datum:    vandaag,
         bv:       isPrive ? 0 : (Number(bvWaarde) || 0),
@@ -155,25 +211,25 @@ export default function Onboarding({ user, onComplete }) {
   };
 
   const stapIndicator = () => (
-    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '2rem' }}>
+    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', marginBottom: '2rem', flexWrap: 'wrap' }}>
       {STAPPEN.map((naam, i) => (
         <div key={i} style={{
-          display: 'flex', alignItems: 'center', gap: '0.4rem',
-          fontFamily: 'var(--font-mono)', fontSize: '0.62rem',
+          display: 'flex', alignItems: 'center', gap: '0.35rem',
+          fontFamily: 'var(--font-mono)', fontSize: '0.6rem',
           color: i === stap ? 'var(--accent)' : i < stap ? 'var(--green)' : 'var(--text-4)',
         }}>
           <div style={{
-            width: 22, height: 22, borderRadius: '50%',
+            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
             background: i === stap ? 'var(--accent)' : i < stap ? 'var(--green)' : 'var(--surface-2)',
             border: `1.5px solid ${i === stap ? 'var(--accent)' : i < stap ? 'var(--green)' : 'var(--border)'}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: i <= stap ? '#fff' : 'var(--text-4)', fontSize: '0.62rem', fontWeight: 600,
+            color: i <= stap ? '#fff' : 'var(--text-4)', fontSize: '0.58rem', fontWeight: 600,
           }}>
             {i < stap ? '✓' : i + 1}
           </div>
-          <span style={{ display: window.innerWidth < 600 ? 'none' : 'inline' }}>{naam}</span>
+          <span style={{ display: window.innerWidth < 640 ? 'none' : 'inline' }}>{naam}</span>
           {i < STAPPEN.length - 1 && (
-            <div style={{ width: 20, height: 1, background: i < stap ? 'var(--green)' : 'var(--border)' }} />
+            <div style={{ width: 16, height: 1, background: i < stap ? 'var(--green)' : 'var(--border)' }} />
           )}
         </div>
       ))}
@@ -182,31 +238,24 @@ export default function Onboarding({ user, onComplete }) {
 
   const renderStap = () => {
     switch (stap) {
-      case 0: // Profiel
+
+      // ── STAP 0: PROFIEL ──────────────────────────────────────────
+      case 0:
         return (
           <>
             <div style={{ marginBottom: '2rem' }}>
-              <div className="section-eyebrow">Stap 1 van 5</div>
+              <div className="section-eyebrow">Stap 1 van 6</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Jouw profiel</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
                 Een paar basisgegevens om de berekeningen op jou af te stemmen.
               </p>
             </div>
 
-            <F
-              label="Geboortejaar"
-              value={geboortejaar}
-              onChange={setGeboortejaar}
-              min={1950} max={CURRENT_YEAR - 18}
-              help={`Huidige leeftijd: ${leeftijd} jaar`}
-            />
-            <F
-              label="Gewenste pensioenleeftijd"
-              value={pensioenLeeftijd}
-              onChange={setPensioenLeeftijd}
-              min={40} max={70}
-              help={`Dat is in ${pensioenJaar} (over ${pensioenJaar - CURRENT_YEAR} jaar)`}
-            />
+            <F label="Geboortejaar" value={geboortejaar} onChange={setGeboortejaar}
+              min={1950} max={CURRENT_YEAR - 18} help={`Huidige leeftijd: ${leeftijd} jaar`} />
+            <F label="Gewenste pensioenleeftijd" value={pensioenLeeftijd} onChange={setPensioenLeeftijd}
+              min={40} max={70} suffix="jaar"
+              help={`Dat is in ${pensioenJaar} (over ${pensioenJaar - CURRENT_YEAR} jaar)`} />
 
             <div className="form-group">
               <label className="form-label">Type belegger</label>
@@ -215,13 +264,9 @@ export default function Onboarding({ user, onComplete }) {
                   { id: 'prive', titel: 'Privébelegger', omschrijving: 'Je belegt alleen privé (box 3), geen BV' },
                   { id: 'dga',   titel: 'DGA / BV',      omschrijving: 'Je spaart via een BV én hebt een privéportefeuille' },
                 ].map(t => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setUserType(t.id)}
+                  <button key={t.id} type="button" onClick={() => setUserType(t.id)}
                     style={{
-                      textAlign: 'left', padding: '1rem',
-                      borderRadius: 'var(--r)',
+                      textAlign: 'left', padding: '1rem', borderRadius: 'var(--r)',
                       border: `2px solid ${userType === t.id ? 'var(--accent)' : 'var(--border)'}`,
                       background: userType === t.id ? 'var(--accent-soft)' : 'var(--surface)',
                       cursor: 'pointer', transition: 'all 0.12s',
@@ -236,11 +281,12 @@ export default function Onboarding({ user, onComplete }) {
           </>
         );
 
-      case 1: // Portefeuille
+      // ── STAP 1: PORTEFEUILLE ─────────────────────────────────────
+      case 1:
         return (
           <>
             <div style={{ marginBottom: '2rem' }}>
-              <div className="section-eyebrow">Stap 2 van 5</div>
+              <div className="section-eyebrow">Stap 2 van 6</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Huidige portefeuille</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
                 Wat is de huidige waarde van je vermogen? Dit is het startpunt van de projectie.
@@ -248,120 +294,87 @@ export default function Onboarding({ user, onComplete }) {
             </div>
 
             {!isPrive && (
-              <F
-                label="BV beleggingsrekening (€)"
-                value={bvWaarde}
-                onChange={v => setBvWaarde(v)}
-                min={0}
-                help="Totale waarde van je BV-beleggingsportefeuille vandaag"
-              />
+              <F label="BV beleggingsrekening (€)" value={bvWaarde} onChange={v => setBvWaarde(v)}
+                min={0} help="Totale waarde van je BV-beleggingsportefeuille vandaag" />
             )}
-            <F
-              label={isPrive ? 'Privé portefeuille (€)' : 'Privé portefeuille (€)'}
-              value={priveWaarde}
-              onChange={v => setPriveWaarde(v)}
+            <F label="Privé portefeuille (€)" value={priveWaarde} onChange={v => setPriveWaarde(v)}
               min={0}
               help={isPrive
                 ? 'Totale waarde van je beleggingsrekening (DEGIRO, IBKR, etc.)'
-                : 'Waarde van je privé beleggingsrekening (DEGIRO, Bolero, etc.)'}
-            />
+                : 'Waarde van je privé beleggingsrekening (DEGIRO, Bolero, etc.)'} />
 
-            <div style={{
-              padding: '1rem', borderRadius: 'var(--r)', background: 'var(--accent-soft)',
-              border: '1px solid var(--accent-mid)', marginTop: '0.5rem',
-            }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '0.4rem' }}>
-                Totaal vandaag
-              </div>
+            <div style={{ padding: '1rem', borderRadius: 'var(--r)', background: 'var(--accent-soft)', border: '1px solid var(--accent-mid)', marginTop: '0.5rem' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '0.4rem' }}>Totaal vandaag</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 700, color: 'var(--accent)' }}>
-                €{((!isPrive ? (Number(bvWaarde) || 0) : 0) + (Number(priveWaarde) || 0)).toLocaleString('nl-NL')}
+                €{((!isPrive ? (Number(bvWaarde)||0) : 0) + (Number(priveWaarde)||0)).toLocaleString('nl-NL')}
               </div>
             </div>
           </>
         );
 
-      case 2: // Inkomensdoel
+      // ── STAP 2: INKOMENSDOEL ─────────────────────────────────────
+      case 2:
         return (
           <>
             <div style={{ marginBottom: '2rem' }}>
-              <div className="section-eyebrow">Stap 3 van 5</div>
-              <h2 style={{ marginBottom: '0.5rem' }}>Inkomensdoel</h2>
+              <div className="section-eyebrow">Stap 3 van 6</div>
+              <h2 style={{ marginBottom: '0.5rem' }}>Inkomensdoel na pensioen</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
-                Hoeveel netto inkomen wil je per jaar na je pensioen? Vul drie niveaus in.
+                Hoeveel netto per jaar wil je na je pensioen? Hypotheeklasten worden apart meegeteld — vul hier exclusief woonlasten in.
               </p>
             </div>
 
-            <F
-              label="Floor — minimaal netto/jaar (€)"
-              value={nettoInkomenVloer}
-              onChange={setNettoInkomenVloer}
-              min={0} step={1000}
-              help={`Minimale levensstandaard. €${Math.round(nettoInkomenVloer/12).toLocaleString()}/mnd`}
-            />
-            <F
-              label="Streef — gewenst netto/jaar (€)"
-              value={nettoInkomenStreef}
-              onChange={setNettoInkomenStreef}
-              min={0} step={1000}
-              help={`Streefdoel. €${Math.round(nettoInkomenStreef/12).toLocaleString()}/mnd`}
-            />
-            <F
-              label="Comfort — maximum netto/jaar (€)"
-              value={nettoInkomenDoel}
-              onChange={setNettoInkomenDoel}
-              min={0} step={1000}
-              help={`Ruime levensstijl. €${Math.round(nettoInkomenDoel/12).toLocaleString()}/mnd`}
-            />
+            <F label="Floor — minimaal netto/jaar (€)" value={nettoInkomenVloer} onChange={setNettoInkomenVloer}
+              min={0} step={1000} prefix="€"
+              help={`Minimale levensstandaard excl. woonlasten. €${Math.round(nettoInkomenVloer/12).toLocaleString()}/mnd`} />
+            <F label="Streef — gewenst netto/jaar (€)" value={nettoInkomenStreef} onChange={setNettoInkomenStreef}
+              min={0} step={1000} prefix="€"
+              help={`Streefdoel excl. woonlasten. €${Math.round(nettoInkomenStreef/12).toLocaleString()}/mnd`} />
+            <F label="Comfort — maximum netto/jaar (€)" value={nettoInkomenDoel} onChange={setNettoInkomenDoel}
+              min={0} step={1000} prefix="€"
+              help={`Ruime levensstijl excl. woonlasten. €${Math.round(nettoInkomenDoel/12).toLocaleString()}/mnd`} />
 
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-3)', lineHeight: 1.6, marginTop: '0.5rem' }}>
-              💡 Bedragen zijn in euro's van nu. De engine corrigeert automatisch voor inflatie.
+            <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--r)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: '0.75rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
+              💡 Bedragen in euro's van nu — inflatie wordt automatisch meegenomen. Hypotheeklasten voer je in de volgende stap in.
             </div>
           </>
         );
 
-      case 3: // Woonlasten & leefkosten (NIEUW)
+      // ── STAP 3: WOONLASTEN ───────────────────────────────────────
+      case 3:
         return (
           <>
             <div style={{ marginBottom: '2rem' }}>
-              <div className="section-eyebrow">Stap 4 van 5</div>
+              <div className="section-eyebrow">Stap 4 van 6</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Woonlasten & leefkosten</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
-                Een inschatting van je maandelijkse kosten. Hiermee berekenen we wat je kunt inleggen — en wat FIRE betekent voor jouw levensstijl. Alles is later aan te passen.
+                Maandelijkse kosten — pre-ingevuld met gemiddelden. Pas aan wat van jou afwijkt.
               </p>
             </div>
 
-            {/* Huidig inkomen */}
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>
               <label className="form-label">Huidig netto maandinkomen</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>€</span>
-                <input
-                  type="number" className="form-input"
-                  style={{ maxWidth: 140 }}
+                <input type="number" className="form-input" style={{ maxWidth: 140 }}
                   value={huidigInkomen} step={100} min={0}
-                  onChange={e => setHuidigInkomen(Math.max(0, Number(e.target.value)))}
-                />
+                  onChange={e => setHuidigInkomen(Math.max(0, Number(e.target.value)))} />
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>/mnd netto</span>
               </div>
             </div>
 
-            {/* Woning toggle */}
-            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label">Woning</label>
+            <Sectie titel="Woning" kleur="var(--accent)">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 {[
                   { id: 'hypotheek', label: 'Koopwoning', sub: 'Hypotheek' },
                   { id: 'huur',      label: 'Huurwoning', sub: 'Huur' },
                 ].map(t => (
-                  <button
-                    key={t.id} type="button"
-                    onClick={() => setWoningType(t.id)}
+                  <button key={t.id} type="button" onClick={() => setWoningType(t.id)}
                     style={{
                       padding: '0.6rem 1rem', borderRadius: 'var(--r)',
                       border: `2px solid ${woningType === t.id ? 'var(--accent)' : 'var(--border)'}`,
                       background: woningType === t.id ? 'var(--accent-soft)' : 'var(--surface)',
-                      cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.78rem',
-                      textAlign: 'left',
+                      cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', textAlign: 'left',
                     }}
                   >
                     <div style={{ fontWeight: 600 }}>{t.label}</div>
@@ -370,58 +383,55 @@ export default function Onboarding({ user, onComplete }) {
                 ))}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>
                     {woningType === 'hypotheek' ? 'Maandlast' : 'Maandhuur'}
                   </span>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>€</span>
-                  <input
-                    type="number" className="form-input"
-                    style={{ maxWidth: 100, textAlign: 'right' }}
+                  <input type="number" className="form-input" style={{ maxWidth: 100, textAlign: 'right' }}
                     value={woningLast} step={50} min={0}
-                    onChange={e => setWoningLast(Math.max(0, Number(e.target.value)))}
-                  />
+                    onChange={e => setWoningLast(Math.max(0, Number(e.target.value)))} />
                 </div>
                 {woningType === 'hypotheek' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>Nog</span>
-                    <input
-                      type="number" className="form-input"
-                      style={{ maxWidth: 70, textAlign: 'right' }}
+                    <input type="number" className="form-input" style={{ maxWidth: 60, textAlign: 'right' }}
                       value={hypotheekJaren} step={1} min={0} max={40}
-                      onChange={e => setHypotheekJaren(Math.max(0, Number(e.target.value)))}
-                    />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>jaar</span>
+                      onChange={e => setHypotheekJaren(Math.max(0, Number(e.target.value)))} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>
+                      jaar ({jaarHypotheekvrij})
+                    </span>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Vaste lasten */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '0.5rem' }}>
-                Overige vaste lasten
-              </div>
+              {woningType === 'hypotheek' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>Restschuld</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>€</span>
+                  <input type="number" className="form-input" style={{ maxWidth: 120, textAlign: 'right' }}
+                    value={hypotheekRestschuld} step={5000} min={0}
+                    onChange={e => setHypotheekRestschuld(Math.max(0, Number(e.target.value)))} />
+                </div>
+              )}
+            </Sectie>
+
+            <Sectie titel="Overige vaste lasten" kleur="var(--accent)">
               <KostenRij label="Energie & water"  value={energie}      onChange={setEnergie}      />
               <KostenRij label="Verzekeringen"     value={verzekering}  onChange={setVerzekering}  />
               <KostenRij label="Abonnementen"      value={abonnementen} onChange={setAbonnementen} />
-            </div>
+            </Sectie>
 
-            {/* Variabele lasten */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--amber)', marginBottom: '0.5rem' }}>
-                Levensonderhoud (variabel)
-              </div>
-              <KostenRij label="Boodschappen"            value={boodschappen} onChange={setBoodschappen} />
-              <KostenRij label="Uit eten & café"         value={uiteten}      onChange={setUiteten}      />
-              <KostenRij label="Transport & auto"        value={transport}    onChange={setTransport}    />
-              <KostenRij label="Vakanties (per maand)"   value={vakantie}     onChange={setVakantie}     />
-              <KostenRij label="Kleding & persoonlijk"   value={kleding}      onChange={setKleding}      />
-              <KostenRij label="Overig"                  value={overig}       onChange={setOverig}       />
-            </div>
+            <Sectie titel="Levensonderhoud (variabel)" kleur="var(--amber)">
+              <KostenRij label="Boodschappen"          value={boodschappen} onChange={setBoodschappen} />
+              <KostenRij label="Uit eten & café"        value={uiteten}      onChange={setUiteten}      />
+              <KostenRij label="Transport & auto"       value={transport}    onChange={setTransport}    />
+              <KostenRij label="Vakanties (per maand)"  value={vakantie}     onChange={setVakantie}     />
+              <KostenRij label="Kleding & persoonlijk"  value={kleding}      onChange={setKleding}      />
+              <KostenRij label="Overig"                 value={overig}       onChange={setOverig}       />
+            </Sectie>
 
-            {/* Samenvatting */}
             <div style={{ padding: '1rem', borderRadius: 'var(--r)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
                 <div>
@@ -443,35 +453,140 @@ export default function Onboarding({ user, onComplete }) {
           </>
         );
 
-      case 4: // Inleg
+      // ── STAP 4: INKOMEN & DGA ────────────────────────────────────
+      case 4:
         return (
           <>
             <div style={{ marginBottom: '2rem' }}>
-              <div className="section-eyebrow">Stap 5 van 5</div>
+              <div className="section-eyebrow">Stap 5 van 6</div>
+              <h2 style={{ marginBottom: '0.5rem' }}>
+                {isPrive ? 'Inkomen later in leven' : 'Inkomen & DGA-instellingen'}
+              </h2>
+              <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
+                {isPrive
+                  ? 'AOW, eventueel aanvullend pensioen en partnerinformatie.'
+                  : 'AOW, pensioen, DGA-salaris, hypotheekstrategie en partnerinformatie.'}
+              </p>
+            </div>
+
+            {/* AOW */}
+            <Sectie titel="AOW" kleur="var(--text-3)">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <F label="AOW-leeftijd" value={aowLeeftijd} onChange={setAowLeeftijd}
+                  min={65} max={72} suffix="jaar" help="Huidig: 67 jaar" />
+                <F label="AOW netto/jaar" value={jaarlijksNettoAOW} onChange={setJaarlijksNettoAOW}
+                  min={0} step={250} prefix="€"
+                  help={`≈ €${Math.round(jaarlijksNettoAOW/12).toLocaleString()}/mnd`} />
+              </div>
+            </Sectie>
+
+            {/* Aanvullend pensioen / lijfrente */}
+            <Sectie titel="Aanvullend pensioen / lijfrente" kleur="var(--text-3)">
+              <div className="form-group">
+                <label className="form-label">Heb je een aanvullend pensioen of lijfrente?</label>
+                <Toggle value={heeftPensioen} onChange={setHeeftPensioen}
+                  options={[{ v: false, l: 'Nee' }, { v: true, l: 'Ja' }]} />
+              </div>
+              {heeftPensioen && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem' }}>
+                  <F label="Ingangsdatum (leeftijd)" value={spmsLeeftijd} onChange={setSpmsLeeftijd}
+                    min={55} max={70} suffix="jaar" />
+                  <F label="Netto per jaar" value={jaarlijksNettoSPMS} onChange={setJaarlijksNettoSPMS}
+                    min={0} step={250} prefix="€"
+                    help={`≈ €${Math.round(jaarlijksNettoSPMS/12).toLocaleString()}/mnd`} />
+                </div>
+              )}
+            </Sectie>
+
+            {/* DGA-specifiek */}
+            {!isPrive && (
+              <Sectie titel="DGA & BV" kleur="var(--accent)">
+                <F label="Verplicht DGA-salaris" value={verplichtDGASalaris} onChange={setVerplichtDGASalaris}
+                  min={0} step={1000} prefix="€"
+                  help="Gebruikelijk loon minimum (wettelijk minimum 2024: €56.000)" />
+
+                {woningType === 'hypotheek' && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Hypotheekstrategie einde rentevaste periode ({jaarHypotheekvrij})</label>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {[
+                          { id: 'bank', label: '🏦 Herfinancieren', sub: 'Nieuwe hypotheek bij bank' },
+                          { id: 'bv',   label: '💼 Aflossen via BV', sub: 'Eenmalige aflossing vanuit BV' },
+                        ].map(t => (
+                          <button key={t.id} type="button"
+                            onClick={() => setHypotheekAflosMethode(t.id)}
+                            style={{
+                              flex: 1, minWidth: 140, padding: '0.6rem 0.75rem', borderRadius: 'var(--r)', textAlign: 'left',
+                              border: `2px solid ${hypotheekAflosMethode === t.id ? 'var(--accent)' : 'var(--border)'}`,
+                              background: hypotheekAflosMethode === t.id ? 'var(--accent-soft)' : 'var(--surface)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 600 }}>{t.label}</div>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', marginTop: '0.15rem' }}>{t.sub}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {hypotheekAflosMethode === 'bank' && (
+                      <F label="Verwachte nieuwe rente bij herfinanciering"
+                        value={hypotheekHerfinRente} onChange={setHypotheekHerfinRente}
+                        min={0} max={15} step={0.1} suffix="%" />
+                    )}
+                  </>
+                )}
+              </Sectie>
+            )}
+
+            {/* Partner */}
+            <Sectie titel="Partner / gezin" kleur="var(--text-3)">
+              <div className="form-group">
+                <label className="form-label">Heb je een partner wiens vermogen meeloopt?</label>
+                <Toggle value={partnerActief} onChange={setPartnerActief}
+                  options={[{ v: false, l: 'Nee' }, { v: true, l: 'Ja' }]} />
+              </div>
+              {partnerActief && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem' }}>
+                  <F label="Geboortejaar partner" value={partnerGeboortejaar} onChange={setPartnerGeboortejaar}
+                    min={1950} max={CURRENT_YEAR - 18}
+                    help={`${CURRENT_YEAR - partnerGeboortejaar} jaar`} />
+                  <F label="Pensioenleeftijd partner" value={partnerPensioenLft} onChange={setPartnerPensioenLft}
+                    min={40} max={70} suffix="jaar" />
+                  <F label="Portefeuille partner nu" value={partnerPriveNu} onChange={setPartnerPriveNu}
+                    min={0} step={5000} prefix="€" />
+                  <F label="Jaarlijkse inleg partner" value={partnerInlegPrive} onChange={setPartnerInlegPrive}
+                    min={0} step={500} prefix="€"
+                    help={`€${Math.round(partnerInlegPrive/12).toLocaleString()}/mnd`} />
+                </div>
+              )}
+            </Sectie>
+          </>
+        );
+
+      // ── STAP 5: INLEG ────────────────────────────────────────────
+      case 5:
+        return (
+          <>
+            <div style={{ marginBottom: '2rem' }}>
+              <div className="section-eyebrow">Stap 6 van 6</div>
               <h2 style={{ marginBottom: '0.5rem' }}>Jaarlijkse inleg</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem' }}>
                 {isPrive
-                  ? 'Hoeveel leg je gemiddeld per jaar bij? Dit bepaalt hoe snel je doel nadert.'
+                  ? 'Hoeveel leg je gemiddeld per jaar bij?'
                   : 'Hoeveel leg je gemiddeld per jaar bij via BV en privé?'}
               </p>
             </div>
 
             {!isPrive && (
-              <F
-                label="Jaarlijkse inleg BV (€)"
-                value={inlegBV}
-                onChange={setInlegBV}
-                min={0} step={1000}
-                help={`€${Math.round(inlegBV/12).toLocaleString()}/mnd — inleg via DGA-salaris, dividend of rechtstreeks`}
-              />
+              <F label="Jaarlijkse inleg BV (€)" value={inlegBV} onChange={setInlegBV}
+                min={0} step={1000} prefix="€"
+                help={`€${Math.round(inlegBV/12).toLocaleString()}/mnd — inleg via DGA-salaris, dividend of rechtstreeks`} />
             )}
-            <F
-              label={isPrive ? 'Jaarlijkse inleg (€)' : 'Jaarlijkse inleg privé (€)'}
-              value={inlegPrive}
-              onChange={setInlegPrive}
-              min={0} step={100}
-              help={`€${Math.round(inlegPrive/12).toLocaleString()}/mnd`}
-            />
+            <F label={isPrive ? 'Jaarlijkse inleg (€)' : 'Jaarlijkse inleg privé (€)'}
+              value={inlegPrive} onChange={setInlegPrive}
+              min={0} step={100} prefix="€"
+              help={`€${Math.round(inlegPrive/12).toLocaleString()}/mnd`} />
 
             {beschikbaarVoorInleg > 0 && (
               <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--r)', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', marginBottom: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
@@ -483,13 +598,8 @@ export default function Onboarding({ user, onComplete }) {
               </div>
             )}
 
-            <div style={{
-              padding: '1rem', borderRadius: 'var(--r)', background: 'var(--green-soft)',
-              border: '1px solid #6ee7b7', marginTop: '0.5rem',
-            }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--green)', marginBottom: '0.4rem' }}>
-                Totale jaarlijkse inleg
-              </div>
+            <div style={{ padding: '1rem', borderRadius: 'var(--r)', background: 'var(--green-soft)', border: '1px solid #6ee7b7', marginTop: '0.5rem' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--green)', marginBottom: '0.4rem' }}>Totale jaarlijkse inleg</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--green)' }}>
                 €{((isPrive ? 0 : inlegBV) + inlegPrive).toLocaleString('nl-NL')}/jaar
               </div>
@@ -497,7 +607,8 @@ export default function Onboarding({ user, onComplete }) {
           </>
         );
 
-      case 5: // Klaar
+      // ── STAP 6: KLAAR ────────────────────────────────────────────
+      case 6:
         return (
           <>
             <div style={{ textAlign: 'center' }}>
@@ -508,19 +619,18 @@ export default function Onboarding({ user, onComplete }) {
                 voor jouw FIRE-pad. Je kunt alles later aanpassen in Instellingen.
               </p>
 
-              {/* AHA card */}
               {ahaLoading && (
                 <div style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(37,99,235,0.12), rgba(16,185,129,0.08))', borderRadius: 'var(--r)', border: '1px solid var(--border)', marginBottom: '1.5rem', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--text-3)' }}>
                   Berekening loopt…
                 </div>
               )}
+
               {!ahaLoading && ahaResult && (() => {
                 const { mc, pkStreef } = ahaResult;
                 const row = mc.years?.find(r => r.leeftijd === pensioenLeeftijd);
-                const priveP50 = row?.priveP50 ?? 0;
+                const priveP50   = row?.priveP50 ?? 0;
                 const kansSucces = mc.kansSucces ?? 0;
-                let fireLeeftijd = null;
-                let fireJaar = null;
+                let fireLeeftijd = null, fireJaar = null;
                 if (pkStreef > 0) {
                   for (const r of (mc.years ?? [])) {
                     const port = r.totaalP50 ?? r.priveP50 ?? 0;
@@ -538,7 +648,7 @@ export default function Onboarding({ user, onComplete }) {
                         </div>
                       </div>
                       <div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-3)', marginBottom: '0.25rem' }}>Verwacht vermogen op pensioendag</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-3)', marginBottom: '0.25rem' }}>Vermogen op pensioendag</div>
                         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--green)' }}>
                           {priveP50 > 0 ? fmt(priveP50) : '—'}
                         </div>
@@ -559,18 +669,19 @@ export default function Onboarding({ user, onComplete }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
                   <div><span style={{ color: 'var(--text-3)' }}>Geboortejaar</span><br /><b>{geboortejaar}</b></div>
                   <div><span style={{ color: 'var(--text-3)' }}>Pensioenleeftijd</span><br /><b>{pensioenLeeftijd} jaar</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Portefeuille nu</span><br /><b>€{((!isPrive ? (Number(bvWaarde)||0) : 0)+(Number(priveWaarde)||0)).toLocaleString()}</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Jaarlijkse inleg</span><br /><b>€{((isPrive ? 0 : inlegBV)+inlegPrive).toLocaleString()}</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Inkomensdoel</span><br /><b>€{Math.round(nettoInkomenDoel/12).toLocaleString()}/mnd</b></div>
-                  <div><span style={{ color: 'var(--text-3)' }}>Maandlasten</span><br /><b>€{totaalUitgaven.toLocaleString('nl-NL')}/mnd</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Portefeuille nu</span><br /><b>€{((!isPrive ? (Number(bvWaarde)||0) : 0) + (Number(priveWaarde)||0)).toLocaleString()}</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Jaarlijkse inleg</span><br /><b>€{((isPrive ? 0 : inlegBV) + inlegPrive).toLocaleString()}</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Inkomensdoel (streef)</span><br /><b>€{Math.round(nettoInkomenStreef/12).toLocaleString()}/mnd</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Woning</span><br /><b>{woningType === 'hypotheek' ? `Hypotheek €${woningLast.toLocaleString()}/mnd` : `Huur €${woningLast.toLocaleString()}/mnd`}</b></div>
+                  <div><span style={{ color: 'var(--text-3)' }}>Maandlasten totaal</span><br /><b>€{totaalUitgaven.toLocaleString('nl-NL')}/mnd</b></div>
+                  {!isPrive && <div><span style={{ color: 'var(--text-3)' }}>DGA-salaris</span><br /><b>€{verplichtDGASalaris.toLocaleString()}/jr</b></div>}
+                  {heeftPensioen && <div><span style={{ color: 'var(--text-3)' }}>Pensioen/lijfrente</span><br /><b>€{Math.round(jaarlijksNettoSPMS/12).toLocaleString()}/mnd v.a. {spmsLeeftijd}j</b></div>}
+                  {partnerActief && <div><span style={{ color: 'var(--text-3)' }}>Partner</span><br /><b>ja — {CURRENT_YEAR - partnerGeboortejaar} jaar, FIRE op {partnerPensioenLft}j</b></div>}
                 </div>
               </div>
 
-              <button
-                className="btn btn-primary"
-                style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
-                onClick={handleComplete}
-              >
+              <button className="btn btn-primary" style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
+                onClick={handleComplete}>
                 Naar mijn dashboard →
               </button>
             </div>
@@ -590,7 +701,7 @@ export default function Onboarding({ user, onComplete }) {
       minHeight: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
       background: 'var(--bg)', padding: '2rem 1rem', paddingTop: '3rem',
     }}>
-      <div style={{ maxWidth: 560, width: '100%' }}>
+      <div style={{ maxWidth: 580, width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             width: 48, height: 48, borderRadius: 12,
@@ -606,19 +717,18 @@ export default function Onboarding({ user, onComplete }) {
         <div className="card fade-up">
           {renderStap()}
 
-          {stap < 5 && (
+          {stap < 6 && (
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
               {stap > 0 && (
                 <button className="btn btn-outline" onClick={() => setStap(s => s - 1)}>
                   ← Terug
                 </button>
               )}
-              <button
-                className="btn btn-primary"
+              <button className="btn btn-primary"
                 onClick={() => setStap(s => s + 1)}
                 disabled={volgendeDisabled}
               >
-                {stap === 4 ? 'Afronden →' : 'Volgende →'}
+                {stap === 5 ? 'Afronden →' : 'Volgende →'}
               </button>
             </div>
           )}
