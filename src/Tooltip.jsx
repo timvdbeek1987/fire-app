@@ -3,31 +3,26 @@ import { useState } from 'react';
 // ─── InfoTip: hover/fixed popup (voor gebruik buiten KPI tiles) ───────────
 export function InfoTip({ text, maxWidth = 260 }) {
   const [open, setOpen] = useState(false);
-  const [pos,  setPos]  = useState({ top:0, left:0, above:true });
-  const [btnEl, setBtnEl] = useState(null);
+  const [pos,  setPos]  = useState({ x: 0, y: 0 });
 
-  const reposition = (el) => {
-    if (!el) return;
-    const r     = el.getBoundingClientRect();
-    const above = r.top > 140;
-    const left  = Math.min(Math.max(8, r.left + r.width/2 - maxWidth/2), window.innerWidth - maxWidth - 8);
-    setPos({ top: r.top, bottom: window.innerHeight - r.top, left, above });
+  const show = (e) => {
+    setPos({ x: e.clientX, y: e.clientY });
+    setOpen(true);
   };
-
-  const show = (e) => { reposition(e.currentTarget); setOpen(true); };
+  const move = (e) => {
+    if (open) setPos({ x: e.clientX, y: e.clientY });
+  };
   const hide = () => setOpen(false);
 
-  const arrowLeft = btnEl
-    ? Math.min(Math.max(10, btnEl.getBoundingClientRect().left + 7 - pos.left), maxWidth - 10)
-    : maxWidth / 2;
+  const above  = pos.y > window.innerHeight / 2;
+  const left   = Math.min(Math.max(8, pos.x - maxWidth / 2), window.innerWidth - maxWidth - 8);
+  const arrowX = Math.min(Math.max(10, pos.x - left), maxWidth - 10);
 
   return (
     <span style={{ position:'relative', display:'inline-flex', alignItems:'center', marginLeft:4, verticalAlign:'middle', flexShrink:0 }}>
       <button
-        ref={setBtnEl}
-        onMouseEnter={show} onMouseLeave={hide}
+        onMouseEnter={show} onMouseMove={move} onMouseLeave={hide}
         onFocus={show} onBlur={hide}
-        onClick={() => open ? hide() : show({ currentTarget: btnEl })}
         style={{
           width:15, height:15, borderRadius:'50%',
           background:'#e8eaf0', border:'1.5px solid #b8bcc9',
@@ -41,8 +36,9 @@ export function InfoTip({ text, maxWidth = 260 }) {
       {open && (
         <span style={{
           position:'fixed',
-          ...(pos.above ? { bottom: pos.bottom + 8 } : { top: pos.top + 22 }),
-          left: pos.left, width: maxWidth,
+          ...(above ? { top: pos.y - 8 } : { top: pos.y + 20 }),
+          ...(above ? { transform: 'translateY(-100%)' } : {}),
+          left, width: maxWidth,
           background:'#1e2436', color:'rgba(255,255,255,0.93)',
           fontSize:'0.68rem', lineHeight:1.65, fontFamily:'var(--font-mono)',
           padding:'0.6rem 0.8rem', borderRadius:8, zIndex:9999,
@@ -51,10 +47,10 @@ export function InfoTip({ text, maxWidth = 260 }) {
           {text}
           <span style={{
             position:'absolute',
-            ...(pos.above
+            ...(above
               ? { top:'100%', borderWidth:'6px 6px 0', borderColor:'#1e2436 transparent transparent' }
               : { bottom:'100%', borderWidth:'0 6px 6px', borderColor:'transparent transparent #1e2436' }),
-            left: arrowLeft, borderStyle:'solid', width:0, height:0,
+            left: arrowX, borderStyle:'solid', width:0, height:0,
           }} />
         </span>
       )}
