@@ -7,6 +7,21 @@ import { InfoTip } from '../Tooltip.jsx';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+function berekenHistorischRendement(updates) {
+  if (!updates || updates.length < 2) return null;
+  const sorted = [...updates].sort((a, b) => a.datum.localeCompare(b.datum));
+  const first = sorted[0];
+  const last  = sorted[sorted.length - 1];
+  const vStart = (first.bv ?? 0) + (first.prive ?? 0);
+  const vEnd   = (last.bv  ?? 0) + (last.prive  ?? 0);
+  if (vStart <= 0) return null;
+  // jaren tussen eerste en laatste entry
+  const jaren = (new Date(last.datum) - new Date(first.datum)) / (365.25 * 24 * 3600 * 1000);
+  if (jaren < 0.25) return null; // minder dan 3 maanden: niet zinvol
+  const cagr = Math.pow(vEnd / vStart, 1 / jaren) - 1;
+  return { cagr, jaren: Math.round(jaren * 10) / 10, aantalEntries: sorted.length };
+}
+
 const ChartTip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -28,9 +43,11 @@ export default function Dashboard({
   countdown, countdownVloer, countdownStreef,
   birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
   partnerActief = false, hasPartner = false, onPartnerToggle,
+  vermogenUpdates = [],
 }) {
   const [showCalc, setShowCalc] = useState(false);
   const isPrive = userType === 'prive';
+  const histRendement = berekenHistorischRendement(vermogenUpdates);
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
   const bvNu             = start.bv   ?? 0;
@@ -191,6 +208,28 @@ export default function Dashboard({
           </>
         )}
       </div>
+
+      {/* Gerealiseerd rendement */}
+      {histRendement && (
+        <div className="card" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.25rem' }}>
+              Gerealiseerd rendement
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 700, color: histRendement.cagr >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {histRendement.cagr >= 0 ? '+' : ''}{(histRendement.cagr * 100).toFixed(1)}%
+              <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>per jaar</span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>
+              op basis van {histRendement.aantalEntries} meetpunten over {histRendement.jaren}j · CAGR vóór inleg
+            </div>
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', textAlign: 'right' }}>
+            <div>Verwacht rendement</div>
+            <div style={{ color: 'var(--text)', fontWeight: 600 }}>{(params.meanReturn * 100).toFixed(1)}% per jaar</div>
+          </div>
+        </div>
+      )}
 
       {/* Maandelijkse onttrekking */}
       {maandelijksOnttrektbaar > 0 && (

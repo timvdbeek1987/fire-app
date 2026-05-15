@@ -24,27 +24,35 @@ export default function Voortgang({ params, start, vermogenUpdates, onVoortgangU
   const [showForm, setShowForm] = useState(false);
   const [saving,   setSaving]   = useState(false);
   const [form, setForm] = useState({
-    datum:   `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2,'0')}-15`,
-    bv:      '',
-    prive:   '',
-    inlegBV: '',
-    notitie: '',
+    datum:      `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2,'0')}-15`,
+    bv:         '',
+    prive:      '',
+    inlegBV:    '',
+    bvSpaar:    '',
+    priveSpaar: '',
+    inlegPrive: '',
+    notitie:    '',
   });
 
   const updates = [...(vermogenUpdates ?? [])]
     .sort((a, b) => b.datum.localeCompare(a.datum));
 
+  const recentEntry = updates[0] ?? null;
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     onVoortgangUpdate({
-      datum:   form.datum,
-      bv:      isPrive ? 0 : (Number(form.bv) || 0),
-      prive:   Number(form.prive)   || 0,
-      inlegBV: isPrive ? 0 : (Number(form.inlegBV) || 0),
+      datum:      form.datum,
+      bv:         isPrive ? 0 : (Number(form.bv) || 0),
+      prive:      Number(form.prive)      || 0,
+      inlegBV:    isPrive ? 0 : (Number(form.inlegBV) || 0),
+      bvSpaar:    isPrive ? 0 : (Number(form.bvSpaar) || 0),
+      priveSpaar: Number(form.priveSpaar) || 0,
+      inlegPrive: Number(form.inlegPrive) || 0,
     });
     setShowForm(false);
-    setForm({ datum: `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2,'0')}-15`, bv: '', prive: '', inlegBV: '', notitie: '' });
+    setForm({ datum: `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2,'0')}-15`, bv: '', prive: '', inlegBV: '', bvSpaar: '', priveSpaar: '', inlegPrive: '', notitie: '' });
     setSaving(false);
   };
 
@@ -71,10 +79,15 @@ export default function Voortgang({ params, start, vermogenUpdates, onVoortgangU
               {!isPrive && (
                 <F label="BV waarde (€)" value={form.bv} onChange={v => setForm(f => ({...f, bv:v}))} placeholder="0" />
               )}
+              {!isPrive && (
+                <F label="BV spaarrekening (€)" value={form.bvSpaar} onChange={v => setForm(f => ({...f, bvSpaar:v}))} placeholder="0" />
+              )}
               <F label={isPrive ? 'Portefeuille waarde (€)' : 'Privé waarde (€)'} value={form.prive} onChange={v => setForm(f => ({...f, prive:v}))} placeholder="0" />
+              <F label="Privé spaarrekening (€)" value={form.priveSpaar} onChange={v => setForm(f => ({...f, priveSpaar:v}))} placeholder="0" help="Spaarrekening saldo" />
               {!isPrive && (
                 <F label="Inleg BV deze periode (€)" value={form.inlegBV} onChange={v => setForm(f => ({...f, inlegBV:v}))} placeholder="0" help="Gestorte bedragen in BV since vorige update" />
               )}
+              <F label="Inleg privé deze periode (€)" value={form.inlegPrive} onChange={v => setForm(f => ({...f, inlegPrive:v}))} placeholder="0" help="Gestorte bedragen privé since vorige update" />
             </div>
             <div className="form-group">
               <label className="form-label">Notitie (optioneel)</label>
@@ -102,13 +115,21 @@ export default function Voortgang({ params, start, vermogenUpdates, onVoortgangU
           <div className="kpi blue">
             <div className="kpi-label">BV nu</div>
             <div className="kpi-value">{fmt(start.bv)}</div>
-            <div className="kpi-sub">{start.jaar ? `per ${start.jaar}-${String(start.maand).padStart(2,'0')}` : '—'}</div>
+            <div className="kpi-sub">
+              {recentEntry && (recentEntry.bvSpaar ?? 0) > 0
+                ? `waarvan ${fmtFull(recentEntry.bvSpaar)} spaar`
+                : (start.jaar ? `per ${start.jaar}-${String(start.maand).padStart(2,'0')}` : '—')}
+            </div>
           </div>
         )}
         <div className="kpi green">
           <div className="kpi-label">{isPrive ? 'Portefeuille nu' : 'Privé nu'}</div>
-          <div className="kpi-value">{fmt(isPrive ? start.prive : start.prive)}</div>
-          <div className="kpi-sub">beleggingsrekening</div>
+          <div className="kpi-value">{fmt(start.prive)}</div>
+          <div className="kpi-sub">
+            {recentEntry && (recentEntry.priveSpaar ?? 0) > 0
+              ? `waarvan ${fmtFull(recentEntry.priveSpaar)} spaar`
+              : 'beleggingsrekening'}
+          </div>
         </div>
         {!isPrive && (
           <div className="kpi gold">
@@ -136,7 +157,9 @@ export default function Voortgang({ params, start, vermogenUpdates, onVoortgangU
                 <tr>
                   <th>Datum</th>
                   {!isPrive && <th className="num">BV</th>}
+                  {!isPrive && updates.some(u => (u.bvSpaar ?? 0) > 0) && <th className="num">Spaar BV</th>}
                   <th className="num">{isPrive ? 'Portefeuille' : 'Privé'}</th>
+                  {updates.some(u => (u.priveSpaar ?? 0) > 0) && <th className="num">Spaar privé</th>}
                   <th className="num">Totaal</th>
                   {!isPrive && <th className="num">Inleg BV</th>}
                 </tr>
@@ -146,7 +169,9 @@ export default function Voortgang({ params, start, vermogenUpdates, onVoortgangU
                   <tr key={i}>
                     <td>{u.datum}</td>
                     {!isPrive && <td className="num">{fmtFull(u.bv)}</td>}
+                    {!isPrive && updates.some(u2 => (u2.bvSpaar ?? 0) > 0) && <td className="num">{(u.bvSpaar ?? 0) > 0 ? fmtFull(u.bvSpaar) : '—'}</td>}
                     <td className="num">{fmtFull(u.prive)}</td>
+                    {updates.some(u2 => (u2.priveSpaar ?? 0) > 0) && <td className="num">{(u.priveSpaar ?? 0) > 0 ? fmtFull(u.priveSpaar) : '—'}</td>}
                     <td className="num"><b>{fmtFull((u.bv??0)+(u.prive??0))}</b></td>
                     {!isPrive && <td className="num">{u.inlegBV ? fmtFull(u.inlegBV) : '—'}</td>}
                   </tr>
