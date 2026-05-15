@@ -1,175 +1,262 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { BASE_PARAMS, fmt } from '../data.js';
 
-function berekenNetto(brutoJaar) {
-  // Box 1 tarieven 2024
-  const schijfMax = 75518, t1 = 0.3697, t2 = 0.495;
-  const ib = brutoJaar <= schijfMax ? brutoJaar * t1 : schijfMax * t1 + (brutoJaar - schijfMax) * t2;
-  // AHK
-  const ahkMax = 3374, ahkStart = 24812, ahkAfbouw = 0.06095;
-  const ahk = Math.max(0, brutoJaar <= ahkStart ? ahkMax : brutoJaar >= schijfMax ? 0 : ahkMax - (brutoJaar - ahkStart) * ahkAfbouw);
-  // Arbeidskorting (simplified)
-  const akMax = 5052, akAfbStart = 37690, akAfbEind = 115302;
-  let ak = 0;
-  if (brutoJaar <= 10741) ak = brutoJaar * 0.08231;
-  else if (brutoJaar <= 23201) ak = 10741 * 0.08231 + (brutoJaar - 10741) * 0.29861;
-  else if (brutoJaar <= akAfbStart) ak = akMax;
-  else if (brutoJaar >= akAfbEind) ak = 0;
-  else ak = Math.max(0, akMax - (brutoJaar - akAfbStart) * 0.06010);
+const CATEGORIEEN = [
+  { key: 'hypotheek',    label: 'Hypotheek / huur',      groep: 'vast',      default: 1500 },
+  { key: 'energie',      label: 'Energie & water',        groep: 'vast',      default: 175  },
+  { key: 'verzekering',  label: 'Verzekeringen',          groep: 'vast',      default: 275  },
+  { key: 'abonnementen', label: 'Abonnementen',           groep: 'vast',      default: 100  },
+  { key: 'boodschappen', label: 'Boodschappen',           groep: 'variabel',  default: 600  },
+  { key: 'uiteten',      label: 'Uit eten & cafe',        groep: 'variabel',  default: 250  },
+  { key: 'transport',    label: 'Transport & auto',       groep: 'variabel',  default: 200  },
+  { key: 'vakantie',     label: 'Vakanties (per maand)',  groep: 'variabel',  default: 200  },
+  { key: 'kleding',      label: 'Kleding & persoonlijk',  groep: 'variabel',  default: 100  },
+  { key: 'overig',       label: 'Overig',                 groep: 'variabel',  default: 150  },
+];
 
-  const ibNetto = Math.max(0, ib - ahk - ak);
-  const nettoJaar = Math.round(brutoJaar - ibNetto);
-  return {
-    brutoMaand: Math.round(brutoJaar / 12),
-    ib: Math.round(ib), ahk: Math.round(ahk), ak: Math.round(ak),
-    ibNetto: Math.round(ibNetto),
-    nettoJaar, nettoMaand: Math.round(nettoJaar / 12),
-    effectief: brutoJaar > 0 ? (ibNetto / brutoJaar * 100).toFixed(1) : '0.0',
-  };
+const GROEPEN = [
+  { id: 'vast',     label: 'Vaste lasten',    kleur: 'var(--accent)' },
+  { id: 'variabel', label: 'Variabele lasten', kleur: 'var(--amber)'  },
+];
+
+function fmtEur(n) {
+  return `€${Math.round(n).toLocaleString('nl-NL')}`;
 }
 
-const COMPARISON_ROWS = [30000, 40000, 50000, 60000, 75000, 90000, 120000, 150000];
+// Eindvermogen extra inleg via annuïteitsformule (maandelijkse PMT)
+function extraEindvermogen(extraMaand, jaarRendement, aantalJaren) {
+  if (aantalJaren <= 0 || extraMaand <= 0) return 0;
+  const r = jaarRendement / 12;
+  const n = aantalJaren * 12;
+  if (Math.abs(r) < 0.000001) return extraMaand * n;
+  return extraMaand * (Math.pow(1 + r, n) - 1) / r;
+}
 
-export default function Salaris() {
-  const [bruto, setBruto] = useState(60000);
+export default function Budget({ params, onParamsChange }) {
+  const pensioenLft = params.pensioenLeeftijd ?? 55;
+  const geboortejaar = params.geboortejaar ?? BASE_PARAMS.geboortejaar;
+  const currentAge  = new Date().getFullYear() - geboortejaar;
+  const jaarTotPensioen = Math.max(0, pensioenLft - currentAge);
+  const meanReturn = params.meanReturn ?? 0.097;
+  const huidigInleg = params.inlegJaarlijksPrive ?? BASE_PARAMS.inlegJaarlijksPrive;
 
-  const res = berekenNetto(bruto);
-  const belastingPct = bruto > 0 ? (res.ibNetto / bruto * 100) : 0;
-  const nettoPct = 100 - belastingPct;
+  const [inkomen, setInkomen] = useState(5000);
+  const [uitgaven, setUitgaven] = useState(() =>
+    Object.fromEntries(CATEGORIEEN.map(c => [c.key, c.default]))
+  );
+  const [opgeslagen, setOpgeslagen] = useState(false);
+
+  const set = key => val => setUitgaven(p => ({ ...p, [key]: Math.max(0, val) }));
+
+  const totaalUitgaven = useMemo(
+    () => Object.values(uitgaven).reduce((s, v) => s + v, 0),
+    [uitgaven]
+  );
+
+  const beschikbaar = Math.max(0, inkomen - totaalUitgaven);
+  const huidigInlegMaand = Math.round(huidigInleg / 12);
+
+  const slaInlegOp = () => {
+    if (!onParamsChange || beschikbaar <= 0) return;
+    onParamsChange({ ...params, inlegJaarlijksPrive: beschikbaar * 12 });
+    setOpgeslagen(true);
+    setTimeout(() => setOpgeslagen(false), 2500);
+  };
+
+  // Per-category share for the visual bar
+  const totalForBar = Math.max(1, totaalUitgaven + beschikbaar);
+
+  // Impact scenarios for compound interest table
+  const scenariosExtra = [25, 50, 100, 200, 500].filter(x => x <= beschikbaar + 100);
 
   return (
     <div className="fade-up">
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Tool</div>
-          <h2 className="section-title">Netto salaris berekening</h2>
+          <h2 className="section-title">Budget & inlegplanner</h2>
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>
+          {jaarTotPensioen}j tot pensioen · rendement {(meanReturn * 100).toFixed(1)}%
         </div>
       </div>
 
       <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
-        {/* Card 1: input + big netto */}
+
+        {/* Inkomen + uitgaven */}
         <div className="card">
-          <div className="card-title" style={{ marginBottom: '1rem' }}>Bruto salaris</div>
-          <div className="form-group">
-            <label className="form-label">Bruto per jaar (€)</label>
-            <input
-              type="number" className="form-input"
-              value={bruto}
-              onChange={e => setBruto(Math.max(0, Number(e.target.value)))}
-              step={1000} min={0} max={500000}
-            />
-          </div>
-          <div className="form-group">
-            <input
-              type="range" min={0} max={200000} step={1000}
-              value={Math.min(bruto, 200000)}
-              onChange={e => setBruto(Number(e.target.value))}
-              style={{ width: '100%', cursor: 'pointer' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)' }}>
-              <span>€0</span><span>€100K</span><span>€200K</span>
+          <div className="card-title" style={{ marginBottom: '1rem' }}>Netto maandinkomen</div>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>€</span>
+              <input
+                type="number" className="form-input"
+                style={{ maxWidth: 140 }}
+                value={inkomen} step={100} min={0}
+                onChange={e => setInkomen(Math.max(0, Number(e.target.value)))}
+              />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>/mnd netto</span>
             </div>
           </div>
-          <div style={{ marginTop: '1.5rem', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(37,99,235,0.08))', borderRadius: 'var(--r)', textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--green)', marginBottom: '0.4rem' }}>Netto per maand</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)' }}>
-              €{res.nettoMaand.toLocaleString('nl-NL')}
+
+          {GROEPEN.map(({ id, label, kleur }) => (
+            <div key={id} style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: kleur, marginBottom: '0.5rem' }}>{label}</div>
+              {CATEGORIEEN.filter(c => c.groep === id).map(c => (
+                <div key={c.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', flex: 1 }}>{c.label}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-4)' }}>€</span>
+                    <input
+                      type="number" className="form-input"
+                      style={{ maxWidth: 90, textAlign: 'right', padding: '0.3rem 0.5rem' }}
+                      value={uitgaven[c.key]} step={25} min={0}
+                      onChange={e => set(c.key)(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)', marginTop: '0.25rem' }}>
-              €{res.nettoJaar.toLocaleString('nl-NL')} per jaar
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Card 2: breakdown */}
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: '1rem' }}>Berekening</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
-            <tbody>
-              {[
-                { label: 'Bruto per jaar', val: bruto, color: 'var(--text)', bold: true },
-                { label: '− Inkomstenbelasting (IB)', val: -res.ib, color: 'var(--red)' },
-                { label: '+ Algemene heffingskorting', val: res.ahk, color: 'var(--green)' },
-                { label: '+ Arbeidskorting', val: res.ak, color: 'var(--green)' },
-                { label: '= Netto per jaar', val: res.nettoJaar, color: 'var(--accent)', bold: true },
-              ].map(({ label, val, color, bold }) => (
-                <tr key={label} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '0.5rem 0', color: 'var(--text-3)' }}>{label}</td>
-                  <td style={{ padding: '0.5rem 0', textAlign: 'right', color, fontWeight: bold ? 700 : 400 }}>
-                    €{Math.abs(val).toLocaleString('nl-NL')}
-                  </td>
-                </tr>
+        {/* Budget overzicht + balk */}
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-title" style={{ marginBottom: '1rem' }}>Budget overzicht</div>
+
+            {/* Stacked bar */}
+            <div style={{ display: 'flex', borderRadius: 'var(--r-sm)', overflow: 'hidden', height: 14, marginBottom: '0.4rem' }}>
+              {CATEGORIEEN.map(c => (
+                <div
+                  key={c.key}
+                  style={{
+                    width: `${(uitgaven[c.key] / totalForBar) * 100}%`,
+                    background: GROEPEN.find(g => g.id === c.groep)?.kleur,
+                    opacity: c.groep === 'vast' ? 0.8 : 0.55,
+                    transition: 'width 0.2s',
+                  }}
+                />
               ))}
-            </tbody>
-          </table>
-
-          {/* Kleurenbalk */}
-          {bruto > 0 && (
-            <div style={{ marginTop: '1.25rem' }}>
-              <div style={{ display: 'flex', borderRadius: 'var(--r-sm)', overflow: 'hidden', height: 12 }}>
-                <div style={{ width: `${nettoPct}%`, background: 'var(--green)', transition: 'width 0.2s' }} />
-                <div style={{ width: `${belastingPct}%`, background: 'var(--red)', opacity: 0.7, transition: 'width 0.2s' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-3)', marginTop: '0.3rem' }}>
-                <span style={{ color: 'var(--green)' }}>Netto {nettoPct.toFixed(1)}%</span>
-                <span style={{ color: 'var(--red)' }}>Belasting {belastingPct.toFixed(1)}%</span>
-              </div>
+              <div style={{ flex: 1, background: 'var(--green)', opacity: 0.7 }} />
             </div>
-          )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--text-3)', marginBottom: '1rem' }}>
+              <span style={{ color: 'var(--accent)' }}>Vast</span>
+              <span style={{ color: 'var(--amber)' }}>Variabel</span>
+              <span style={{ color: 'var(--green)' }}>Inlegbaar</span>
+            </div>
 
-          <div style={{ marginTop: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>
-            Effectief belastingtarief: <strong>{res.effectief}%</strong>
+            {/* Summary rows */}
+            {[
+              { label: 'Netto inkomen', val: inkomen, kleur: 'var(--text)', bold: true },
+              { label: 'Vaste lasten', val: -CATEGORIEEN.filter(c => c.groep === 'vast').reduce((s, c) => s + uitgaven[c.key], 0), kleur: 'var(--accent)' },
+              { label: 'Variabele lasten', val: -CATEGORIEEN.filter(c => c.groep === 'variabel').reduce((s, c) => s + uitgaven[c.key], 0), kleur: 'var(--amber)' },
+            ].map(({ label, val, kleur, bold }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', marginBottom: '0.4rem' }}>
+                <span style={{ color: 'var(--text-3)' }}>{label}</span>
+                <span style={{ color: kleur, fontWeight: bold ? 700 : 400 }}>
+                  {val < 0 ? '−' : ''}{fmtEur(Math.abs(val))}/mnd
+                </span>
+              </div>
+            ))}
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0.75rem 0' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 700 }}>Beschikbaar om te beleggen</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, color: beschikbaar > 0 ? 'var(--green)' : 'var(--red)' }}>
+                {fmtEur(beschikbaar)}/mnd
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', marginBottom: '1rem' }}>
+              <span>Huidig ingestelde inleg</span>
+              <span>{fmtEur(huidigInlegMaand)}/mnd</span>
+            </div>
+
+            {beschikbaar !== huidigInlegMaand && (
+              <button
+                className={`btn ${opgeslagen ? 'btn-gold' : 'btn-primary'} w-full`}
+                style={{ justifyContent: 'center' }}
+                onClick={slaInlegOp}
+                disabled={beschikbaar <= 0}
+              >
+                {opgeslagen ? '✓ Opgeslagen' : `Sla ${fmtEur(beschikbaar)}/mnd op als inleg`}
+              </button>
+            )}
+          </div>
+
+          {/* Totaal per categorie */}
+          <div className="card">
+            <div className="card-title" style={{ marginBottom: '0.75rem' }}>Per categorie</div>
+            {CATEGORIEEN.map(c => {
+              const pct = inkomen > 0 ? (uitgaven[c.key] / inkomen * 100) : 0;
+              return (
+                <div key={c.key} style={{ marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', marginBottom: '0.2rem' }}>
+                    <span style={{ color: 'var(--text-3)' }}>{c.label}</span>
+                    <span>{fmtEur(uitgaven[c.key])}/mnd <span style={{ color: 'var(--text-4)' }}>({pct.toFixed(0)}%)</span></span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: GROEPEN.find(g => g.id === c.groep)?.kleur, transition: 'width 0.2s' }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Card 3: Vergelijkingstabel */}
-      <div className="card" style={{ marginBottom: '1.25rem' }}>
-        <div className="card-title" style={{ marginBottom: '1rem' }}>Vergelijkingstabel</div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+      {/* Compound interest impact */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <div className="card-title">Wat levert bezuinigen op?</div>
+            <div className="card-subtitle">
+              Extra inleg → rendement {(meanReturn * 100).toFixed(1)}% · {jaarTotPensioen}j tot pensioen
+            </div>
+          </div>
+        </div>
+        <div className="table-scroll">
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                {['Bruto/jaar', 'Bruto/mnd', 'Belasting', 'Kortingen', 'Netto/mnd', 'Eff. tarief'].map(h => (
-                  <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: 'var(--text-3)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
+              <tr>
+                <th>Extra inleg/mnd</th>
+                <th className="num">Extra/jaar</th>
+                <th className="num">Extra eindvermogen</th>
+                <th>Minder dan</th>
               </tr>
             </thead>
             <tbody>
-              {COMPARISON_ROWS.map(b => {
-                const r2 = berekenNetto(b);
-                const isSelected = b === bruto || (bruto > b - 5000 && bruto <= b);
+              {scenariosExtra.map(x => {
+                const eindv = extraEindvermogen(x, meanReturn, jaarTotPensioen);
+                // Find a category that costs approximately x euro
+                const cat = CATEGORIEEN.find(c => Math.abs(uitgaven[c.key] - x) < 50);
                 return (
-                  <tr
-                    key={b}
-                    onClick={() => setBruto(b)}
-                    style={{
-                      borderBottom: '1px solid var(--border)',
-                      cursor: 'pointer',
-                      background: isSelected ? 'var(--accent-soft)' : 'transparent',
-                      transition: 'background 0.1s',
-                    }}
-                  >
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: isSelected ? 700 : 400, color: isSelected ? 'var(--accent)' : 'var(--text)' }}>€{b.toLocaleString('nl-NL')}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>€{r2.brutoMaand.toLocaleString('nl-NL')}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: 'var(--red)' }}>€{r2.ibNetto.toLocaleString('nl-NL')}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: 'var(--green)' }}>€{(r2.ahk + r2.ak).toLocaleString('nl-NL')}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: 600 }}>€{r2.nettoMaand.toLocaleString('nl-NL')}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: 'var(--amber)' }}>{r2.effectief}%</td>
+                  <tr key={x}>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>+{fmtEur(x)}/mnd</td>
+                    <td className="num">{fmtEur(x * 12)}</td>
+                    <td className="num" style={{ fontWeight: 700, color: 'var(--accent)' }}>{fmt(eindv)}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)' }}>
+                      {cat ? `bijv. de helft van ${cat.label.toLowerCase()}` : '—'}
+                    </td>
                   </tr>
                 );
               })}
+              {beschikbaar > 0 && (
+                <tr style={{ background: 'rgba(16,185,129,0.06)' }}>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--green)' }}>+{fmtEur(beschikbaar)}/mnd</td>
+                  <td className="num">{fmtEur(beschikbaar * 12)}</td>
+                  <td className="num" style={{ fontWeight: 700, color: 'var(--green)' }}>{fmt(extraEindvermogen(beschikbaar, meanReturn, jaarTotPensioen))}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--green)', fontWeight: 600 }}>← volledig beschikbaar budget</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Disclaimer */}
-      <div style={{
-        padding: '0.75rem 1rem', borderRadius: 'var(--r)',
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', lineHeight: 1.7,
-      }}>
-        Indicatief · Box 1 tarieven 2024 · excl. ZVW en pensioenpremie
+        <div style={{ marginTop: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.63rem', color: 'var(--text-4)', lineHeight: 1.7 }}>
+          Eindvermogen berekend als toekomstige waarde van maandelijkse inleg bij {(meanReturn * 100).toFixed(1)}% nominaal rendement · vóór VRH en belasting · indicatief
+        </div>
       </div>
     </div>
   );
