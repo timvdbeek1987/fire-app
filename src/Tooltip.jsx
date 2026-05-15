@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // ─── InfoTip: hover/fixed popup (voor gebruik buiten KPI tiles) ───────────
 export function InfoTip({ text, maxWidth = 260 }) {
@@ -19,7 +20,7 @@ export function InfoTip({ text, maxWidth = 260 }) {
   const arrowX = Math.min(Math.max(10, pos.x - left), maxWidth - 10);
 
   return (
-    <span style={{ position:'relative', display:'inline-flex', alignItems:'center', marginLeft:4, verticalAlign:'middle', flexShrink:0 }}>
+    <span style={{ display:'inline-flex', alignItems:'center', marginLeft:4, verticalAlign:'middle', flexShrink:0 }}>
       <button
         onMouseEnter={show} onMouseMove={move} onMouseLeave={hide}
         onFocus={show} onBlur={hide}
@@ -33,11 +34,11 @@ export function InfoTip({ text, maxWidth = 260 }) {
         aria-label="Meer informatie"
       >i</button>
 
-      {open && (
+      {open && createPortal(
         <span style={{
           position:'fixed',
-          ...(above ? { top: pos.y - 8 } : { top: pos.y + 20 }),
-          ...(above ? { transform: 'translateY(-100%)' } : {}),
+          top: above ? pos.y - 12 : pos.y + 18,
+          transform: above ? 'translateY(-100%)' : undefined,
           left, width: maxWidth,
           background:'#1e2436', color:'rgba(255,255,255,0.93)',
           fontSize:'0.68rem', lineHeight:1.65, fontFamily:'var(--font-mono)',
@@ -52,7 +53,8 @@ export function InfoTip({ text, maxWidth = 260 }) {
               : { bottom:'100%', borderWidth:'0 6px 6px', borderColor:'transparent transparent #1e2436' }),
             left: arrowX, borderStyle:'solid', width:0, height:0,
           }} />
-        </span>
+        </span>,
+        document.body
       )}
     </span>
   );
