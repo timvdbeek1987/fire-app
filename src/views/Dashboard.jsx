@@ -46,6 +46,7 @@ export default function Dashboard({
   vermogenUpdates = [],
 }) {
   const [showCalc, setShowCalc] = useState(false);
+  const [showOnttrekking, setShowOnttrekking] = useState(false);
   const [inflatieCorrectie, setInflatieCorrectie] = useState(true);
   const isPrive = userType === 'prive';
   const histRendement = berekenHistorischRendement(vermogenUpdates);
@@ -287,102 +288,124 @@ export default function Dashboard({
       {maandelijksOnttrektbaar > 0 && (
         <div className="card" style={{ marginBottom: '1.25rem', borderTop: '3px solid var(--green)' }}>
 
-          {/* Header + toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)' }}>
-              Maandelijkse onttrekking
-            </div>
-            <button
-              onClick={() => setInflatieCorrectie(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.35rem',
-                padding: '0.25rem 0.65rem', borderRadius: 20,
-                border: `1.5px solid ${inflatieCorrectie ? 'var(--green)' : 'var(--border)'}`,
-                background: inflatieCorrectie ? 'rgba(16,185,129,0.1)' : 'var(--surface-2)',
-                cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.65rem',
-                color: inflatieCorrectie ? 'var(--green)' : 'var(--text-3)',
-                transition: 'all 0.15s',
-              }}
-            >
-              {inflatieCorrectie ? '● Koopkracht-constant' : '○ Nominaal vast'}
-            </button>
-          </div>
-
-          {/* Bedrag */}
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)', lineHeight: 1 }}>
-              €{maandelijksOnttrektbaar.toLocaleString('nl-NL')}
-              <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd in euro's van vandaag</span>
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginTop: '0.25rem' }}>
-              {inflatieCorrectie
-                ? <>Koopkracht blijft gelijk — nominale onttrekking groeit mee met inflatie ({(infMO * 100).toFixed(1)}%/jr)</>
-                : <>Nominaal vast op €{nominaalVastBedrag.toLocaleString('nl-NL')}/mnd — koopkracht daalt met inflatie, maar portfolio gaat langer mee</>
-              }
-            </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.15rem' }}>
-              Exclusief AOW &amp; pensioen
-            </div>
-          </div>
-
-          {/* Kerngetallen */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
-            <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portefeuille op pensioendag</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
-                {fmt(isPrive ? priveOpPensioendag : totaalOpPensioendag)}
-              </div>
-            </div>
-            <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portfolio leeg op</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
-                {inflatieCorrectie ? uitputtingLftMO : uitputtingNominaalLft}j
-              </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-4)', marginTop: '0.15rem' }}>
-                {inflatieCorrectie
-                  ? `${uitputtingLftMO - pensioenLeeftijdMO} jaar`
-                  : `${uitputtingNominaalJaren} jaar`}
-              </div>
-            </div>
-            <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Inflatie (aanname)</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
-                {(infMO * 100).toFixed(1)}% /jr
-              </div>
-            </div>
-          </div>
-
-          {/* Inflatietabel */}
-          {inflatieTable.length > 0 && (
+          {/* Altijd zichtbaar: label + bedrag + uitklap */}
+          <div
+            onClick={() => setShowOnttrekking(v => !v)}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}
+          >
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.5rem' }}>
-                Effect van inflatie over de onttrekkingsperiode
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.25rem' }}>
+                Maandelijkse onttrekking
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>Leeftijd</th>
-                      <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>Per maand (nominaal)</th>
-                      <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>In euro's van vandaag</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inflatieTable.map(({ lft, nominaal, reeel, isEinde }, i) => (
-                      <tr key={lft} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '0.35rem 0.5rem', color: (i === 0 || isEinde) ? 'var(--text)' : 'var(--text-3)', fontWeight: (i === 0 || isEinde) ? 600 : 400 }}>
-                          {lft}j{i === 0 ? ' (aanvang)' : isEinde ? ' (einde)' : ''}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '0.35rem 0.5rem', fontWeight: (i === 0 || isEinde) ? 600 : 400 }}>
-                          €{nominaal.toLocaleString('nl-NL')}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '0.35rem 0.5rem', color: inflatieCorrectie ? 'var(--green)' : (i === 0 ? 'var(--green)' : 'var(--amber)'), fontWeight: (i === 0 || isEinde) ? 600 : 400 }}>
-                          €{reeel.toLocaleString('nl-NL')}
-                        </td>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)', lineHeight: 1 }}>
+                €{maandelijksOnttrektbaar.toLocaleString('nl-NL')}
+                <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd</span>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.2rem' }}>
+                {isPrive
+                  ? 'Netto besteedbaar · VRH verwerkt · geen belasting op onttrekking'
+                  : 'Vóór dividendbelasting · VRH verwerkt · excl. AOW & pensioen'}
+              </div>
+            </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', flexShrink: 0 }}>
+              {showOnttrekking ? '▲' : '▼'}
+            </span>
+          </div>
+
+          {/* Uitklapbaar detail */}
+          {showOnttrekking && (
+            <div style={{ marginTop: '1.25rem' }}>
+
+              {/* Inflatie toggle */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                <button
+                  onClick={() => setInflatieCorrectie(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.35rem',
+                    padding: '0.25rem 0.65rem', borderRadius: 20,
+                    border: `1.5px solid ${inflatieCorrectie ? 'var(--green)' : 'var(--border)'}`,
+                    background: inflatieCorrectie ? 'rgba(16,185,129,0.1)' : 'var(--surface-2)',
+                    cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.65rem',
+                    color: inflatieCorrectie ? 'var(--green)' : 'var(--text-3)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {inflatieCorrectie ? '● Koopkracht-constant' : '○ Nominaal vast'}
+                </button>
+              </div>
+
+              {/* Toelichting modus */}
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginBottom: '1rem' }}>
+                {inflatieCorrectie
+                  ? <>Koopkracht blijft gelijk — nominale onttrekking groeit mee met inflatie ({(infMO * 100).toFixed(1)}%/jr), portfolio raakt eerder leeg</>
+                  : <>Nominaal vast op €{nominaalVastBedrag.toLocaleString('nl-NL')}/mnd — koopkracht daalt met inflatie, portfolio gaat langer mee</>
+                }
+              </div>
+
+              {/* Kerngetallen */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+                <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portefeuille op pensioendag</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                    {fmt(isPrive ? priveOpPensioendag : totaalOpPensioendag)}
+                  </div>
+                </div>
+                <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portfolio leeg op</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                    {inflatieCorrectie ? uitputtingLftMO : uitputtingNominaalLft}j
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-4)', marginTop: '0.15rem' }}>
+                    {inflatieCorrectie ? uitputtingLftMO - pensioenLeeftijdMO : uitputtingNominaalJaren} jaar
+                  </div>
+                </div>
+                <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Inflatie (aanname)</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                    {(infMO * 100).toFixed(1)}% /jr
+                  </div>
+                </div>
+              </div>
+
+              {/* Inflatietabel */}
+              {inflatieTable.length > 0 && (
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.5rem' }}>
+                    Effect van inflatie over de onttrekkingsperiode
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                        <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>Leeftijd</th>
+                        <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>Per maand (nominaal)</th>
+                        <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>In euro's van vandaag</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {inflatieTable.map(({ lft, nominaal, reeel, isEinde }, i) => (
+                        <tr key={lft} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '0.35rem 0.5rem', fontWeight: 600 }}>
+                            {lft}j {i === 0 ? '(aanvang)' : '(einde)'}
+                          </td>
+                          <td style={{ textAlign: 'right', padding: '0.35rem 0.5rem', fontWeight: 600 }}>
+                            €{nominaal.toLocaleString('nl-NL')}
+                          </td>
+                          <td style={{ textAlign: 'right', padding: '0.35rem 0.5rem', color: inflatieCorrectie ? 'var(--green)' : (i === 0 ? 'var(--green)' : 'var(--amber)'), fontWeight: 600 }}>
+                            €{reeel.toLocaleString('nl-NL')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Belastingnoot */}
+              <div style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
+                {isPrive
+                  ? <>💡 <b>Belastingen:</b> VRH (box 3, ~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Onttrekkingen uit privévermogen zijn zelf belastingvrij.</>
+                  : <>💡 <b>Belastingen:</b> VRH (~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Dividendbelasting (~{((params.dividendbelasting ?? 0.245) * 100).toFixed(0)}%) op BV-uitkeringen is <b>nog niet verwerkt</b> — het werkelijke netto besteedbare bedrag ligt lager.</>
+                }
               </div>
             </div>
           )}
