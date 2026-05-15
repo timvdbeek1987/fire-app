@@ -46,8 +46,54 @@ export default function Dashboard({
   vermogenUpdates = [],
 }) {
   const [showCalc, setShowCalc] = useState(false);
+  const [inflatieCorrectie, setInflatieCorrectie] = useState(true);
   const isPrive = userType === 'prive';
   const histRendement = berekenHistorischRendement(vermogenUpdates);
+
+  // Onttrekking berekeningen
+  const pensioenLeeftijdMO = params.pensioenLeeftijd ?? 55;
+  const uitputtingLftMO    = params.uitputtingsLeeftijd ?? 90;
+  const nMaandenMO         = Math.max(12, (uitputtingLftMO - pensioenLeeftijdMO) * 12);
+  const infMO              = params.inflatieGemiddeld ?? BASE_PARAMS.inflatieGemiddeld ?? 0.02;
+  const jaarTotPensioenMO  = Math.max(0, pensioenLeeftijdMO - (CURRENT_YEAR - birthYear));
+  const cumulInflatiePens  = Math.pow(1 + infMO, jaarTotPensioenMO);
+
+  const nominaalVastPMT = useMemo(() => {
+    const portfolio = isPrive ? priveOpPensioendag : totaalOpPensioendag;
+    if (!portfolio) return 0;
+    const rNom = params.rendementNaPensioen ?? BASE_PARAMS.rendementNaPensioen ?? 0.05;
+    const vrh  = params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing ?? 0.02088;
+    const rNetNom = rNom - vrh;
+    const rM = Math.pow(1 + Math.max(-0.5, rNetNom), 1 / 12) - 1;
+    const pmt = Math.abs(rM) < 0.000001
+      ? portfolio / nMaandenMO
+      : portfolio * rM / (1 - Math.pow(1 + rM, -nMaandenMO));
+    return Math.max(0, Math.round(pmt));
+  }, [isPrive, priveOpPensioendag, totaalOpPensioendag, params, nMaandenMO]);
+
+  const inflatieTable = useMemo(() => {
+    if (!maandelijksOnttrektbaar && !nominaalVastPMT) return [];
+    const rows = [];
+    for (let lft = pensioenLeeftijdMO; lft <= uitputtingLftMO; lft += 5) {
+      const jarenVandaag = lft - (CURRENT_YEAR - birthYear);
+      const cumInf = Math.pow(1 + infMO, Math.max(0, jarenVandaag));
+      if (inflatieCorrectie) {
+        rows.push({
+          lft,
+          nominaal: Math.round(maandelijksOnttrektbaar * cumInf),
+          reeel:    maandelijksOnttrektbaar,
+        });
+      } else {
+        rows.push({
+          lft,
+          nominaal: nominaalVastPMT,
+          reeel:    Math.round(nominaalVastPMT / cumInf),
+        });
+      }
+    }
+    return rows;
+  }, [inflatieCorrectie, maandelijksOnttrektbaar, nominaalVastPMT,
+      pensioenLeeftijdMO, uitputtingLftMO, infMO, birthYear]);
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
   const bvNu             = start.bv   ?? 0;
@@ -234,34 +280,106 @@ export default function Dashboard({
       {/* Maandelijkse onttrekking */}
       {maandelijksOnttrektbaar > 0 && (
         <div className="card" style={{ marginBottom: '1.25rem', borderTop: '3px solid var(--green)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.25rem' }}>
-                Maandelijkse onttrekking
-              </div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)', lineHeight: 1 }}>
-                €{maandelijksOnttrektbaar.toLocaleString('nl-NL')}
-                <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd</span>
-              </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-4)', marginTop: '0.3rem' }}>
-                excl. AOW / pensioen · portefeuille €0 op leeftijd {params.uitputtingsLeeftijd ?? 90}j
+
+          {/* Header + toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)' }}>
+              Maandelijkse onttrekking
+            </div>
+            <button
+              onClick={() => setInflatieCorrectie(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                padding: '0.25rem 0.65rem', borderRadius: 20,
+                border: `1.5px solid ${inflatieCorrectie ? 'var(--green)' : 'var(--border)'}`,
+                background: inflatieCorrectie ? 'rgba(16,185,129,0.1)' : 'var(--surface-2)',
+                cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.65rem',
+                color: inflatieCorrectie ? 'var(--green)' : 'var(--text-3)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {inflatieCorrectie ? '● Koopkracht-constant' : '○ Nominaal vast'}
+            </button>
+          </div>
+
+          {/* Bedrag */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)', lineHeight: 1 }}>
+              €{inflatieCorrectie
+                  ? maandelijksOnttrektbaar.toLocaleString('nl-NL')
+                  : Math.round(nominaalVastPMT / cumulInflatiePens).toLocaleString('nl-NL')}
+              <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd</span>
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginTop: '0.25rem' }}>
+              {inflatieCorrectie
+                ? <>Netto besteedbaar in euro's van vandaag · koopkracht blijft gelijk · nominale onttrekking stijgt mee met inflatie</>
+                : <>Netto besteedbaar bij aanvang pensioen (in euro's van vandaag) · nominaal vast op €{nominaalVastPMT.toLocaleString('nl-NL')}/mnd · koopkracht daalt met inflatie</>
+              }
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.15rem' }}>
+              Exclusief AOW &amp; pensioen · portefeuille op €0 op leeftijd {uitputtingLftMO}j ({uitputtingLftMO - pensioenLeeftijdMO} jaar onttrekkingsperiode)
+            </div>
+          </div>
+
+          {/* Kerngetallen */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portefeuille op pensioendag</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                {fmt(isPrive ? priveOpPensioendag : totaalOpPensioendag)}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', minWidth: 240 }}>
-              <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Portefeuille op pensioendag</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
-                  {fmt(isPrive ? priveOpPensioendag : totaalOpPensioendag)}
-                </div>
+            <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Onttrekkingsperiode</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                {uitputtingLftMO - pensioenLeeftijdMO} jaar
               </div>
-              <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Onttrekkingsperiode</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
-                  {(params.uitputtingsLeeftijd ?? 90) - (params.pensioenLeeftijd ?? 55)}j
-                </div>
+            </div>
+            <div style={{ padding: '0.6rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.56rem', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Inflatie (aanname)</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.88rem', fontWeight: 700 }}>
+                {(infMO * 100).toFixed(1)}% /jr
               </div>
             </div>
           </div>
+
+          {/* Inflatietabel */}
+          {inflatieTable.length > 0 && (
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.5rem' }}>
+                Effect van inflatie per 5 jaar
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th style={{ textAlign: 'left', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>Leeftijd</th>
+                      <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>Per maand (nominaal)</th>
+                      <th style={{ textAlign: 'right', padding: '0.3rem 0.5rem', color: 'var(--text-3)', fontWeight: 500 }}>In euro's van vandaag</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inflatieTable.map(({ lft, nominaal, reeel }, i) => (
+                      <tr key={lft} style={{ borderBottom: '1px solid var(--border)', opacity: i === 0 ? 1 : 0.85 }}>
+                        <td style={{ padding: '0.35rem 0.5rem', color: i === 0 ? 'var(--text)' : 'var(--text-3)', fontWeight: i === 0 ? 600 : 400 }}>
+                          {lft}j{i === 0 ? ' (aanvang)' : ''}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '0.35rem 0.5rem', fontWeight: i === 0 ? 600 : 400 }}>
+                          €{nominaal.toLocaleString('nl-NL')}
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '0.35rem 0.5rem', color: inflatieCorrectie ? 'var(--green)' : (i === 0 ? 'var(--green)' : 'var(--amber)'), fontWeight: i === 0 ? 600 : 400 }}>
+                          €{reeel.toLocaleString('nl-NL')}
+                          {inflatieCorrectie && i > 0 && (
+                            <span style={{ color: 'var(--text-4)', fontSize: '0.62rem', marginLeft: '0.3rem' }}>= gelijk</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

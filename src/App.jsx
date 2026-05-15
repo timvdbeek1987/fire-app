@@ -122,7 +122,7 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [view,    setView]    = useState('dashboard');
   const [showOnboarding,  setShowOnboarding]  = useState(false);
-  const [partnerToggle,   setPartnerToggle]   = useState(true);
+  const [partnerToggle,   setPartnerToggle]   = useState(false);
 
   // Params & data
   const [params,          setParams]          = useState({});
