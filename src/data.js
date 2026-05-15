@@ -721,9 +721,14 @@ export function berekenVeiligPensioenKapitaal(params, priveOpPensioendag = 0, ta
   const po = { ...p, inlegJaarlijksBV: 0, inlegJaarlijksPrive: 0 };
 
   const kansVoor = (portfolioWaarde) => {
+    // For DGA: test BV in isolation (prive: 0).
+    // Including priveOpPensioendag inflates kansSucces because DGA privé principal
+    // can never be fully drawn (only yields), so (bv + prive) > 0 at 85 is always
+    // true regardless of whether BV was depleted — causing all sweep points to pass
+    // the 80% threshold and returning the minimum (€50K) for every income goal.
     const start = p.priveModus
       ? { bv: 0, prive: portfolioWaarde, jaar: pensioenJaar, maand: 1 }
-      : { bv: portfolioWaarde, prive: priveOpPensioendag, jaar: pensioenJaar, maand: 1 };
+      : { bv: portfolioWaarde, prive: 0, jaar: pensioenJaar, maand: 1 };
     return runMonteCarlo(po, start, nSims).kansSucces;
   };
 
