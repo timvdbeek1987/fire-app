@@ -121,6 +121,7 @@ export default function App() {
   const [user,    setUser]    = useState(undefined); // undefined = loading, null = not logged in
   const [profile, setProfile] = useState(null);
   const [view,    setView]    = useState('dashboard');
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Params & data
   const [params,          setParams]          = useState({});
@@ -407,6 +408,8 @@ export default function App() {
       await upsertVoortgang(user.id, { id, ...portfolioStart });
       setVermogenUpdates([portfolioStart]);
     }
+    setShowOnboarding(false);
+    setView('dashboard');
   }, [user, saveParams]);
 
   // Maandelijkse onttrekking (annuïteit)
@@ -443,7 +446,7 @@ export default function App() {
   }
 
   // ── Onboarding ───────────────────────────────────────────
-  if (supabaseEnabled && user && (!profile || !profile.onboarding_completed)) {
+  if (supabaseEnabled && user && (!profile || !profile.onboarding_completed || showOnboarding)) {
     return <Onboarding user={user} onComplete={handleOnboardingComplete} />;
   }
 
@@ -470,6 +473,7 @@ export default function App() {
     partnerActief,
     onParamsChange: saveParams,
     onVoortgangUpdate: saveVoortgangUpdate,
+    onRestart: () => { setShowOnboarding(true); setView('dashboard'); },
   };
 
   const renderView = () => {

@@ -17,7 +17,7 @@ const F = ({ label, help, value, onChange, step=1, min, max, suffix, prefix }) =
   </div>
 );
 
-export default function Instellingen({ params, onParamsChange, userType = 'dga' }) {
+export default function Instellingen({ params, onParamsChange, userType = 'dga', onRestart }) {
   const isPrive = userType === 'prive';
   const [local,  setLocal]  = useState(() => ({ ...BASE_PARAMS, ...params }));
   const [saved,  setSaved]  = useState(false);
@@ -228,6 +228,19 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga' 
           )}
         </div>
       </div>
+
+      {/* Onboarding herstarten */}
+      {onRestart && (
+        <div className="card" style={{ marginTop:'1rem', borderTop:'3px solid var(--border)' }}>
+          <div className="card-title" style={{ marginBottom:'0.5rem' }}>Profiel opnieuw instellen</div>
+          <p style={{ fontFamily:'var(--font-mono)', fontSize:'0.75rem', color:'var(--text-3)', marginBottom:'1rem', lineHeight:1.6 }}>
+            Loop de setup-wizard opnieuw door om je profiel, woonlasten, inkomensdoelen en DGA-instellingen bij te werken. Je huidige voortgangsdata blijft bewaard.
+          </p>
+          <button className="btn btn-outline" onClick={onRestart}>
+            ↩ Onboarding opnieuw doorlopen
+          </button>
+        </div>
+      )}
 
       {/* Samenvatting */}
       <div className="card" style={{ marginTop:'1rem' }}>
