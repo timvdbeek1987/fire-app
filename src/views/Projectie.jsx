@@ -62,17 +62,19 @@ export default function Projectie({
       const streefP = { ...params, nettoInkomenDoel: params.nettoInkomenStreef ?? BASE_PARAMS.nettoInkomenStreef };
       return {
         jaar:          r.jaar,
-        leeftijd:      r.leeftijd,
-        bvP25:         r.bvP25,
-        bvP50:         r.bvP50,
-        bvP75:         r.bvP75,
-        totaalP25:     r.totaalP25,
-        totaalP50:     r.totaalP50,
-        totaalP75:     r.totaalP75,
-        priveP25:      r.priveP25,
-        priveP50:      r.priveP50,
-        priveP75:      r.priveP75,
-        doelCurve:     berekenVereistKapitaalAnalytisch(params,  r.leeftijd) * sfComfort,
+        leeftijd:         r.leeftijd,
+        bvP25:            r.bvP25,
+        bvP50:            r.bvP50,
+        bvP75:            r.bvP75,
+        totaalP25:        r.totaalP25,
+        totaalP50:        r.totaalP50,
+        totaalP75:        r.totaalP75,
+        priveP25:         r.priveP25,
+        priveP50:         r.priveP50,
+        priveP75:         r.priveP75,
+        onttrekkingBV:    r.onttrekkingBV,
+        onttrekkingPrive: r.onttrekkingPrive,
+        doelCurve:        berekenVereistKapitaalAnalytisch(params,  r.leeftijd) * sfComfort,
         doelCurveStreef: berekenVereistKapitaalAnalytisch(streefP, r.leeftijd) * sfStreef,
         doelCurveVloer:  berekenVereistKapitaalAnalytisch(vloerP,  r.leeftijd) * sfVloer,
       };
@@ -227,6 +229,7 @@ export default function Projectie({
                     </>
                   )}
                   <th className="num">Totaal normaal</th>
+                  <th className="num">Bruto onttr.</th>
                   <th className="num">Doel comfort</th>
                 </tr>
               </thead>
@@ -252,6 +255,9 @@ export default function Projectie({
                         </>
                       )}
                       <td className="num"><b>{fmt(r.totaalP50)}</b></td>
+                      <td className="num" style={{ color: r.leeftijd >= pensioenLeeftijd ? 'var(--accent)' : 'var(--text-4)' }}>
+                        {r.leeftijd >= pensioenLeeftijd && r.onttrekkingBV > 0 ? fmt(r.onttrekkingBV) : '—'}
+                      </td>
                       <td className="num" style={{ color:'var(--amber)' }}>{fmt(r.doelCurve)}</td>
                     </tr>
                   ))

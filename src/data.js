@@ -433,10 +433,13 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const nettoUitBV     = nettoDGA + nettoDividend;
       const nettoInkomen   = nettoUitBV + ontPv + inkSPMS + inkAOW;
 
+      // Split vpb proportionally over beleggingen / spaar
+      const vpbBeleg = rendBVb > 0 ? vpb * (rendBelegBVb / rendBVb) : 0;
+      const vpbSpaar = vpb - vpbBeleg;
       const ontBVBeleg = Math.min(ontBV, bvBeleg + rendBVn * (bvBeleg / Math.max(1, bv)));
       const ontBVSpaar = Math.max(0, ontBV - ontBVBeleg);
-      bvBeleg = Math.max(0, bvBeleg + rendBelegBVb - (rendBelegBVb > 0 ? rendBelegBVb * p.vennootschapsbelasting : 0) - ontBVBeleg);
-      bvSpaar = Math.max(0, bvSpaar + rendSpaarBVb - (rendSpaarBVb > 0 ? rendSpaarBVb * p.vennootschapsbelasting : 0) - ontBVSpaar);
+      bvBeleg = Math.max(0, bvBeleg + rendBelegBVb - vpbBeleg - ontBVBeleg);
+      bvSpaar = Math.max(0, bvSpaar + rendSpaarBVb - vpbSpaar - ontBVSpaar);
       bv      = bvBeleg + bvSpaar;
 
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
