@@ -26,7 +26,8 @@ export default function Dashboard({
   params, start, mcResult, pensioenKapitaal, pkLoading,
   pkVloer, pkStreef, priveOpPensioendag, totaalOpPensioendag, maandelijksOnttrektbaar,
   countdown, countdownVloer, countdownStreef,
-  birthYear = BASE_PARAMS.geboortejaar, userType = 'dga', partnerActief = false,
+  birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
+  partnerActief = false, hasPartner = false, onPartnerToggle,
 }) {
   const [showCalc, setShowCalc] = useState(false);
   const isPrive = userType === 'prive';
@@ -35,6 +36,7 @@ export default function Dashboard({
   const bvNu             = start.bv   ?? 0;
   const priveNu          = (start.prive ?? 0) + (partnerActief ? (params.partnerPriveNu ?? 0) : 0);
   const totaalNu         = bvNu + priveNu;
+  const inlegGezamenlijk = (params.inlegJaarlijksPrive ?? 0) + (partnerActief ? (params.partnerInlegPrive ?? 0) : 0);
   const currentAge       = CURRENT_YEAR - birthYear;
 
   // Countdown tiers
@@ -96,8 +98,27 @@ export default function Dashboard({
           <div className="section-eyebrow">Dashboard</div>
           <h2 className="section-title">FIRE Overzicht</h2>
         </div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>
-          Leeftijd {currentAge}j · Pensioen op {pensioenLeeftijd}j ({pensioenJaar})
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {hasPartner && onPartnerToggle && (
+            <button
+              onClick={onPartnerToggle}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0.3rem 0.75rem', borderRadius: 20,
+                border: `1.5px solid ${partnerActief ? 'var(--green)' : 'var(--border)'}`,
+                background: partnerActief ? 'rgba(16,185,129,0.1)' : 'var(--surface-2)',
+                cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.68rem',
+                color: partnerActief ? 'var(--green)' : 'var(--text-3)',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: '0.75rem' }}>{partnerActief ? '●' : '○'}</span>
+              {partnerActief ? 'Gezamenlijk' : 'Alleen ik'}
+            </button>
+          )}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-3)' }}>
+            Leeftijd {currentAge}j · Pensioen op {pensioenLeeftijd}j ({pensioenJaar})
+          </div>
         </div>
       </div>
 
@@ -120,9 +141,13 @@ export default function Dashboard({
               <div className="kpi-sub">mediaan · leeftijd {pensioenLeeftijd}j</div>
             </div>
             <div className="kpi gold">
-              <div className="kpi-label">Jaarlijkse inleg</div>
-              <div className="kpi-value">{fmt(params.inlegJaarlijksPrive ?? 0)}</div>
-              <div className="kpi-sub">{partnerActief ? 'gezamenlijke inleg' : `€${Math.round((params.inlegJaarlijksPrive ?? 0) / 12).toLocaleString()}/mnd gemiddeld`}</div>
+              <div className="kpi-label">{partnerActief ? 'Gezamenlijke inleg' : 'Jaarlijkse inleg'}</div>
+              <div className="kpi-value">{fmt(inlegGezamenlijk)}</div>
+              <div className="kpi-sub">
+                {partnerActief
+                  ? `jij €${Math.round((params.inlegJaarlijksPrive ?? 0) / 12).toLocaleString()} + partner €${Math.round((params.partnerInlegPrive ?? 0) / 12).toLocaleString()}/mnd`
+                  : `€${Math.round(inlegGezamenlijk / 12).toLocaleString()}/mnd gemiddeld`}
+              </div>
             </div>
             <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
               <div className="kpi-label">

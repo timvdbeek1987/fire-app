@@ -121,7 +121,8 @@ export default function App() {
   const [user,    setUser]    = useState(undefined); // undefined = loading, null = not logged in
   const [profile, setProfile] = useState(null);
   const [view,    setView]    = useState('dashboard');
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding,  setShowOnboarding]  = useState(false);
+  const [partnerToggle,   setPartnerToggle]   = useState(true);
 
   // Params & data
   const [params,          setParams]          = useState({});
@@ -219,7 +220,8 @@ export default function App() {
 
   const birthYear = effectiveParams.geboortejaar ?? BIRTH_YEAR;
 
-  const partnerActief = effectiveParams.partnerActief ?? false;
+  const hasPartner    = effectiveParams.partnerActief ?? false;
+  const partnerActief = hasPartner && partnerToggle;
 
   // Start of simulation
   const start = useMemo(() => {
@@ -472,6 +474,8 @@ export default function App() {
     vermogenUpdates,
     userType,
     partnerActief,
+    hasPartner,
+    onPartnerToggle: () => setPartnerToggle(t => !t),
     onParamsChange: saveParams,
     onVoortgangUpdate: saveVoortgangUpdate,
     onRestart: () => { setShowOnboarding(true); setView('dashboard'); },
