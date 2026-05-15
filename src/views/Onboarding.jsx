@@ -125,8 +125,8 @@ export default function Onboarding({ user, onComplete }) {
   const pensioenJaar = geboortejaar + pensioenLeeftijd;
   const jaarHypotheekvrij = woningType === 'hypotheek' ? CURRENT_YEAR + hypotheekJaren : 9999;
 
-  const totaalWoonlasten   = woningLast + energie + verzekering + abonnementen;
-  const totaalVariabel     = boodschappen + uiteten + transport + vakantie + kleding + overig;
+  const totaalWoonlasten   = woningLast + energie + verzekering + abonnementen + boodschappen;
+  const totaalVariabel     = uiteten + transport + vakantie + kleding + overig;
   const totaalUitgaven     = totaalWoonlasten + totaalVariabel;
   const beschikbaarVoorInleg = Math.max(0, huidigInkomen - totaalUitgaven);
 
@@ -421,10 +421,10 @@ export default function Onboarding({ user, onComplete }) {
               <KostenRij label="Energie & water"  value={energie}      onChange={setEnergie}      />
               <KostenRij label="Verzekeringen"     value={verzekering}  onChange={setVerzekering}  />
               <KostenRij label="Abonnementen"      value={abonnementen} onChange={setAbonnementen} />
+              <KostenRij label="Boodschappen"      value={boodschappen} onChange={setBoodschappen} />
             </Sectie>
 
             <Sectie titel="Levensonderhoud (variabel)" kleur="var(--amber)">
-              <KostenRij label="Boodschappen"          value={boodschappen} onChange={setBoodschappen} />
               <KostenRij label="Uit eten & café"        value={uiteten}      onChange={setUiteten}      />
               <KostenRij label="Transport & auto"       value={transport}    onChange={setTransport}    />
               <KostenRij label="Vakanties (per maand)"  value={vakantie}     onChange={setVakantie}     />

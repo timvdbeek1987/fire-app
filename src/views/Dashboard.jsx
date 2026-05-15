@@ -122,7 +122,8 @@ export default function Dashboard({
   const vasteLastenMetHypo    = (bgt.hypotheek    ?? params.maandelijkseHypotheeklast ?? 0)
                                + (bgt.energie       ?? 175)
                                + (bgt.verzekering   ?? 275)
-                               + (bgt.abonnementen  ?? 100);
+                               + (bgt.abonnementen  ?? 100)
+                               + (bgt.boodschappen  ?? 600);
   const vasteLastenZonderHypo = vasteLastenMetHypo
                                - (bgt.hypotheek     ?? params.maandelijkseHypotheeklast ?? 0);
   const hypoAflosJaar  = params.jaarHypotheekvrij ?? 9999;

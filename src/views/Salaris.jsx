@@ -6,7 +6,7 @@ const CATEGORIEEN = [
   { key: 'energie',      label: 'Energie & water',        groep: 'vast',      default: 175  },
   { key: 'verzekering',  label: 'Verzekeringen',          groep: 'vast',      default: 275  },
   { key: 'abonnementen', label: 'Abonnementen',           groep: 'vast',      default: 100  },
-  { key: 'boodschappen', label: 'Boodschappen',           groep: 'variabel',  default: 600  },
+  { key: 'boodschappen', label: 'Boodschappen',           groep: 'vast',      default: 600  },
   { key: 'uiteten',      label: 'Uit eten & cafe',        groep: 'variabel',  default: 250  },
   { key: 'transport',    label: 'Transport & auto',       groep: 'variabel',  default: 200  },
   { key: 'vakantie',     label: 'Vakanties (per maand)',  groep: 'variabel',  default: 200  },
