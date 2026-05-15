@@ -313,7 +313,10 @@ export default function Dashboard({
                 €{maandelijksOnttrektbaar.toLocaleString('nl-NL')}
                 <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd</span>
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.2rem' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--amber)', marginTop: '0.2rem' }}>
+                Normaal scenario — geen veiligheidsmarge
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.1rem' }}>
                 {isPrive ? 'In euro\'s van vandaag · excl. AOW & pensioen' : 'Vóór dividendbelasting · excl. AOW & pensioen'}
               </div>
             </div>
@@ -410,8 +413,13 @@ export default function Dashboard({
                 </div>
               )}
 
+              {/* Methodologie-noot */}
+              <div style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
+                ⚠️ <b>Let op:</b> dit bedrag is gebaseerd op het <b>normaal scenario</b> (verwachte portefeuille, mediaan van 2500 simulaties). De FIRE Countdown gebruikt een strengere maatstaf: het vereiste kapitaal waarbij 80% van alle scenario's de portefeuille in stand houdt. Daardoor kan het onttrekkingsbedrag hier hoger lijken dan wat de Countdown als "haalbaar" markeert.
+              </div>
+
               {/* Belastingnoot */}
-              <div style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
+              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
                 {isPrive
                   ? <>💡 <b>Belastingen:</b> VRH (box 3, ~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Onttrekkingen uit privévermogen zijn zelf belastingvrij.</>
                   : <>💡 <b>Belastingen:</b> VRH (~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Dividendbelasting (~{((params.dividendbelasting ?? 0.245) * 100).toFixed(0)}%) op BV-uitkeringen is <b>nog niet verwerkt</b> — het werkelijke netto besteedbare bedrag ligt lager.</>
@@ -509,6 +517,9 @@ export default function Dashboard({
                 </div>
               );
             })}
+          </div>
+          <div style={{ marginTop: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', lineHeight: 1.6 }}>
+            Vereist kapitaal: 80% van 2500 scenario's houdt portefeuille in stand tot 85j. Het onttrekkingsbedrag hierboven is gebaseerd op het normaal scenario en kan hoger liggen — zie de tegel "Maandelijkse onttrekking" voor de toelichting.
           </div>
         </div>
 
