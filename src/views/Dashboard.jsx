@@ -52,7 +52,7 @@ export default function Dashboard({
 
   // Onttrekking berekeningen
   const pensioenLeeftijdMO = params.pensioenLeeftijd ?? 55;
-  const uitputtingLftMO    = params.uitputtingsLeeftijd ?? 90;
+  const uitputtingLftMO    = Math.min(95, params.uitputtingsLeeftijd ?? 90);
   const infMO              = params.inflatieGemiddeld ?? BASE_PARAMS.inflatieGemiddeld ?? 0.02;
   const jaarTotPensioenMO  = Math.max(0, pensioenLeeftijdMO - (CURRENT_YEAR - birthYear));
   const cumulInflatiePens  = Math.pow(1 + infMO, jaarTotPensioenMO);
@@ -79,7 +79,7 @@ export default function Dashboard({
   }, [isPrive, priveOpPensioendag, totaalOpPensioendag, nominaalVastBedrag,
       pensioenLeeftijdMO, uitputtingLftMO, params]);
 
-  const uitputtingNominaalLft = pensioenLeeftijdMO + uitputtingNominaalJaren;
+  const uitputtingNominaalLft = Math.min(95, pensioenLeeftijdMO + uitputtingNominaalJaren);
 
   const inflatieTable = useMemo(() => {
     if (!maandelijksOnttrektbaar) return [];
