@@ -232,10 +232,7 @@ export default function App() {
     return { ...start, prive: (start.prive ?? 0) + (effectiveParams.partnerPriveNu ?? 0) };
   }, [start, partnerActief, effectiveParams.partnerPriveNu]);
 
-  const mcParams = useMemo(() => {
-    if (!partnerActief) return effectiveParams;
-    return { ...effectiveParams, inlegJaarlijksPrive: (effectiveParams.inlegJaarlijksPrive ?? 0) + (effectiveParams.partnerInlegPrive ?? 0) };
-  }, [effectiveParams, partnerActief]);
+  const mcParams = useMemo(() => effectiveParams, [effectiveParams]);
 
   // Privé at pension day (for pk calculation)
   // Gebruik leeftijd-1 (laatste opbouwjaar) zodat we de waarde VOOR de eerste onttrekking tonen
@@ -266,6 +263,10 @@ export default function App() {
     r:     mcParams.meanReturn,
     i:     mcParams.inlegJaarlijksBV,
     ip:    mcParams.inlegJaarlijksPrive,
+    partnerActief:      effectiveParams.partnerActief ?? false,
+    partnerIP:          effectiveParams.partnerInlegPrive ?? 0,
+    partnerGeb:         effectiveParams.partnerGeboortejaar ?? 0,
+    partnerPens:        effectiveParams.partnerPensioenLeeftijd ?? 0,
   });
 
   useEffect(() => {

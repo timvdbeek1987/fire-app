@@ -33,7 +33,7 @@ export default function Dashboard({
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
   const bvNu             = start.bv   ?? 0;
-  const priveNu          = start.prive ?? 0;
+  const priveNu          = (start.prive ?? 0) + (partnerActief ? (params.partnerPriveNu ?? 0) : 0);
   const totaalNu         = bvNu + priveNu;
   const currentAge       = CURRENT_YEAR - birthYear;
 

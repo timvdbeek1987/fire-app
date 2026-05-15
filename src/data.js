@@ -191,6 +191,12 @@ function clamp(val, min, max) {
 function runSinglePath(p, start, so, randNorm, strategie = null) {
   const birthYear = p.geboortejaar ?? BIRTH_YEAR;
 
+  // Partner split-inleg: partner contributes only until their own pension age
+  const partnerActief      = p.partnerActief ?? false;
+  const partnerBirthYear   = p.partnerGeboortejaar ?? birthYear;
+  const partnerPensioenLft = p.partnerPensioenLeeftijd ?? p.pensioenLeeftijd ?? 55;
+  const partnerInlegPv     = partnerActief ? (p.partnerInlegPrive ?? 0) : 0;
+
   let bvBeleg = Math.max(0, (start.bv ?? 0) - (start.bvSpaar ?? 0));
   let bvSpaar = start.bvSpaar ?? 0;
   let bv      = bvBeleg + bvSpaar;
@@ -259,8 +265,9 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
 
     if (!isPensioen) {
       // === OPBOUWFASE ===
-      const inBV = p.inlegJaarlijksBV    * frac;
-      const inPv = p.inlegJaarlijksPrive * frac;
+      const inBV = p.inlegJaarlijksBV * frac;
+      const partnerBijdraagt = partnerInlegPv > 0 && (jaar - partnerBirthYear) < partnerPensioenLft;
+      const inPv = p.inlegJaarlijksPrive * frac + (partnerBijdraagt ? partnerInlegPv * frac : 0);
 
       const rendBelegBVb = (bvBeleg + inBV * 0.5) * jaarR;
       const vpbBeleg     = rendBelegBVb > 0 ? rendBelegBVb * p.vennootschapsbelasting : 0;
@@ -440,6 +447,12 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       priveBeleg = Math.max(0, priveBeleg + rendBelegPvn - ontPv * (priveBeleg / Math.max(1, prive)));
       priveSpaar = Math.max(0, priveSpaar + rendSpaarPvn - ontPv * (priveSpaar / Math.max(1, prive)));
       prive      = priveBeleg + priveSpaar;
+
+      // Partner still accumulating while primary is already retired
+      if (partnerInlegPv > 0 && (jaar - partnerBirthYear) < partnerPensioenLft) {
+        priveBeleg += partnerInlegPv * frac;
+        prive       = priveBeleg + priveSpaar;
+      }
 
       rows.push({
         jaar, leeftijd,
