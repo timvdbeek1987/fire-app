@@ -40,11 +40,21 @@ export default function Budget({ params, onParamsChange }) {
   const meanReturn = params.meanReturn ?? 0.097;
   const huidigInleg = params.inlegJaarlijksPrive ?? BASE_PARAMS.inlegJaarlijksPrive;
 
-  const [inkomen, setInkomen] = useState(5000);
+  const [inkomen, setInkomen] = useState(() => params.budget?.inkomen ?? 5000);
   const [uitgaven, setUitgaven] = useState(() =>
-    Object.fromEntries(CATEGORIEEN.map(c => [c.key, c.default]))
+    Object.fromEntries(CATEGORIEEN.map(c => [c.key, params.budget?.[c.key] ?? c.default]))
   );
   const [opgeslagen, setOpgeslagen] = useState(false);
+
+  const heeftWijzigingen = inkomen !== (params.budget?.inkomen ?? 5000) ||
+    CATEGORIEEN.some(c => uitgaven[c.key] !== (params.budget?.[c.key] ?? c.default));
+
+  const slaAllesOp = () => {
+    if (!onParamsChange) return;
+    onParamsChange({ ...params, budget: { inkomen, ...uitgaven } });
+    setOpgeslagen(true);
+    setTimeout(() => setOpgeslagen(false), 2500);
+  };
 
   const set = key => val => setUitgaven(p => ({ ...p, [key]: Math.max(0, val) }));
 
@@ -177,13 +187,22 @@ export default function Budget({ params, onParamsChange }) {
             {beschikbaar !== huidigInlegMaand && (
               <button
                 className={`btn ${opgeslagen ? 'btn-gold' : 'btn-primary'} w-full`}
-                style={{ justifyContent: 'center' }}
+                style={{ justifyContent: 'center', marginBottom: '0.5rem' }}
                 onClick={slaInlegOp}
                 disabled={beschikbaar <= 0}
               >
                 {opgeslagen ? '✓ Opgeslagen' : `Sla ${fmtEur(beschikbaar)}/mnd op als inleg`}
               </button>
             )}
+
+            <button
+              className="btn w-full"
+              style={{ justifyContent: 'center', background: heeftWijzigingen ? 'var(--surface-2)' : 'transparent', border: '1px solid var(--border)', color: heeftWijzigingen ? 'var(--text)' : 'var(--text-4)', cursor: heeftWijzigingen ? 'pointer' : 'default' }}
+              onClick={slaAllesOp}
+              disabled={!heeftWijzigingen}
+            >
+              {heeftWijzigingen ? 'Budget opslaan' : '✓ Budget opgeslagen'}
+            </button>
           </div>
 
           {/* Totaal per categorie */}
