@@ -109,14 +109,26 @@ export default function Dashboard({
   const inlegGezamenlijk = (params.inlegJaarlijksPrive ?? 0) + (partnerActief ? (params.partnerInlegPrive ?? 0) : 0);
   const currentAge       = CURRENT_YEAR - birthYear;
 
-  // Countdown tiers
+  // Countdown
   const cdV = countdownVloer;
   const cdS = countdownStreef;
   const cdC = countdown;
 
-  // Welke tier is als eerst bereikbaar?
-  const eersteCD = cdV ?? cdS ?? cdC;
+  const eersteCD  = cdV ?? cdS ?? cdC;
   const tierKleur = cdV ? 'var(--accent)' : cdS ? 'var(--green)' : 'var(--amber)';
+
+  // Vaste lasten (uit budget of defaults)
+  const bgt = params.budget ?? {};
+  const vasteLastenMetHypo    = (bgt.hypotheek    ?? params.maandelijkseHypotheeklast ?? 0)
+                               + (bgt.energie       ?? 175)
+                               + (bgt.verzekering   ?? 275)
+                               + (bgt.abonnementen  ?? 100);
+  const vasteLastenZonderHypo = vasteLastenMetHypo
+                               - (bgt.hypotheek     ?? params.maandelijkseHypotheeklast ?? 0);
+  const hypoAflosJaar  = params.jaarHypotheekvrij ?? 9999;
+  const hypoAflosLft   = hypoAflosJaar - birthYear;
+  const heeftHypotheek = (bgt.hypotheek ?? params.maandelijkseHypotheeklast ?? 0) > 0
+                      && hypoAflosJaar < 9998;
 
   // Grafiekdata
   const chartData = useMemo(() => {
@@ -302,9 +314,7 @@ export default function Dashboard({
                 <span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-3)', marginLeft: '0.4rem' }}>/mnd</span>
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.2rem' }}>
-                {isPrive
-                  ? 'Netto besteedbaar · VRH verwerkt · geen belasting op onttrekking'
-                  : 'Vóór dividendbelasting · VRH verwerkt · excl. AOW & pensioen'}
+                {isPrive ? 'In euro\'s van vandaag · excl. AOW & pensioen' : 'Vóór dividendbelasting · excl. AOW & pensioen'}
               </div>
             </div>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', flexShrink: 0 }}>
@@ -420,7 +430,7 @@ export default function Dashboard({
           <div className="card-header">
             <div>
               <div className="card-title">FIRE Countdown</div>
-              <div className="card-subtitle">Wanneer bereik je elk tier?</div>
+              <div className="card-subtitle">Wanneer bereik je elk inkomensniveau?</div>
             </div>
             {eersteCD?.alBereikt
               ? <CheckCircle size={20} color="var(--green)" />
@@ -428,45 +438,77 @@ export default function Dashboard({
             }
           </div>
 
+          {/* Vaste lasten context */}
+          {vasteLastenMetHypo > 0 && (
+            <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+              <span>Vaste lasten nu: <b style={{ color: 'var(--text)' }}>€{vasteLastenMetHypo.toLocaleString()}/mnd</b></span>
+              {heeftHypotheek && (
+                <span>Na hypotheek ({hypoAflosLft}j): <b style={{ color: 'var(--text)' }}>€{vasteLastenZonderHypo.toLocaleString()}/mnd</b></span>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {inkomenTiers.map(({ key, inkomen, cd, kleur }) => (
-              <div key={key} style={{
-                padding: '0.75rem', borderRadius: 'var(--r)',
-                background: 'var(--surface-2)',
-                borderLeft: `3px solid ${kleur}`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.09em', color: kleur, fontWeight: 600 }}>{key}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', marginLeft: '0.5rem' }}>
-                      €{Math.round(inkomen/12).toLocaleString()}/mnd
-                    </span>
+            {inkomenTiers.map(({ key, inkomen, cd, kleur }) => {
+              const maandelijks = Math.round(inkomen / 12);
+              const dektNu       = vasteLastenMetHypo > 0 && maandelijks >= vasteLastenMetHypo;
+              const dektNaHypo   = !dektNu && heeftHypotheek && maandelijks >= vasteLastenZonderHypo;
+              const dektNiet     = vasteLastenMetHypo > 0 && !dektNu && !dektNaHypo;
+              return (
+                <div key={key} style={{
+                  padding: '0.75rem', borderRadius: 'var(--r)',
+                  background: 'var(--surface-2)',
+                  borderLeft: `3px solid ${kleur}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.09em', color: kleur, fontWeight: 600 }}>{key}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', marginLeft: '0.5rem' }}>
+                        €{maandelijks.toLocaleString()}/mnd
+                      </span>
+                    </div>
+                    {cd && (
+                      <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>
+                        <span style={{ color: 'var(--text-3)' }}>lft </span>
+                        <b style={{ color: 'var(--text)' }}>{cd.doelLeeftijd}j</b>
+                        <span style={{ color: 'var(--text-3)', marginLeft: '0.4rem' }}>· {fmt(cd.pensioenKapitaal)}</span>
+                      </div>
+                    )}
                   </div>
-                  {cd && (
-                    <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>
-                      <span style={{ color: 'var(--text-3)' }}>lft </span>
-                      <b style={{ color: 'var(--text)' }}>{cd.doelLeeftijd}j</b>
-                      <span style={{ color: 'var(--text-3)', marginLeft: '0.4rem' }}>· {fmt(cd.pensioenKapitaal)}</span>
+                  {cd && !cd.alBereikt && (
+                    <div style={{ marginTop: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: kleur, fontWeight: 600 }}>
+                      {cd.jaren > 0 ? `${cd.jaren}j ` : ''}{cd.maanden}mnd
+                    </div>
+                  )}
+                  {cd?.alBereikt && (
+                    <div style={{ marginTop: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--green)', fontWeight: 600 }}>
+                      ✓ Al bereikt!
+                    </div>
+                  )}
+                  {!cd && (
+                    <div style={{ marginTop: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-4)' }}>
+                      {pkLoading ? 'Berekenen…' : 'Niet bereikbaar vóór pensioenleeftijd'}
+                    </div>
+                  )}
+                  {/* Vaste lasten dekking */}
+                  {dektNu && (
+                    <div style={{ marginTop: '0.4rem', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--green)' }}>
+                      ✓ Dekt vaste lasten (€{vasteLastenMetHypo.toLocaleString()}/mnd)
+                    </div>
+                  )}
+                  {dektNaHypo && (
+                    <div style={{ marginTop: '0.4rem', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--amber)' }}>
+                      ✓ Dekt lasten na hypotheek ({hypoAflosLft}j) · dan €{vasteLastenZonderHypo.toLocaleString()}/mnd
+                    </div>
+                  )}
+                  {dektNiet && (
+                    <div style={{ marginTop: '0.4rem', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-4)' }}>
+                      ✗ Dekt vaste lasten niet (tekort €{(vasteLastenMetHypo - maandelijks).toLocaleString()}/mnd)
                     </div>
                   )}
                 </div>
-                {cd && !cd.alBereikt && (
-                  <div style={{ marginTop: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: kleur, fontWeight: 600 }}>
-                    {cd.jaren > 0 ? `${cd.jaren}j ` : ''}{cd.maanden}mnd
-                  </div>
-                )}
-                {cd?.alBereikt && (
-                  <div style={{ marginTop: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--green)', fontWeight: 600 }}>
-                    ✓ Al bereikt!
-                  </div>
-                )}
-                {!cd && (
-                  <div style={{ marginTop: '0.3rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-4)' }}>
-                    {pkLoading ? 'Berekenen…' : 'Niet bereikbaar vóór pensioenleeftijd'}
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
