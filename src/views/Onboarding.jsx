@@ -615,7 +615,7 @@ export default function Onboarding({ user, onComplete }) {
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
               <h2 style={{ marginBottom: '0.75rem' }}>Je bent klaar om te starten!</h2>
               <p style={{ color: 'var(--text-3)', fontSize: '0.88rem', lineHeight: 1.7, maxWidth: 400, margin: '0 auto 1.5rem' }}>
-                Je profiel is ingesteld. De Monte Carlo engine berekent nu duizenden scenario's
+                Je profiel is ingesteld. De simulatie-engine berekent nu duizenden doorgerekende scenario's
                 voor jouw FIRE-pad. Je kunt alles later aanpassen in Instellingen.
               </p>
 

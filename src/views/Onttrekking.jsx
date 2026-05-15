@@ -223,7 +223,7 @@ export default function Onttrekking({
             </div>
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-3)', lineHeight: 1.8 }}>
-            <div>P50 verwacht op pensioendag: <strong style={{ color: 'var(--text)' }}>{fmt(verwachtPortfolio)}</strong></div>
+            <div>Normaal scenario verwacht op pensioendag: <strong style={{ color: 'var(--text)' }}>{fmt(verwachtPortfolio)}</strong></div>
             <div>Reëel vandaag: <strong style={{ color: 'var(--text)' }}>{fmt(portfolioReeel)}</strong></div>
             <div>Reëel netto rendement: <strong style={{ color: 'var(--text)' }}>{(rNettoJaar * 100).toFixed(2)}%/jaar</strong></div>
           </div>
@@ -281,7 +281,7 @@ export default function Onttrekking({
         <div className="card-header">
           <div>
             <div className="card-title">Portefeuilleverloop — alle 3 strategieën</div>
-            <div className="card-subtitle">Reëel vermogen (huidig geld) · analytisch mediaan rendement · geselecteerde strategie dikker</div>
+            <div className="card-subtitle">Reëel vermogen (huidig geld) · analytisch gemiddeld rendement · geselecteerde strategie dikker</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>

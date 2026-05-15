@@ -135,10 +135,10 @@ export default function Dashboard({
             <div className="kpi blue">
               <div className="kpi-label">
                 Verwacht bij pensioen
-                <InfoTip text={`Mediaan (P50) verwachte portefeuillewaarde op leeftijd ${pensioenLeeftijd} jaar, op basis van 2500 Monte Carlo simulaties. Berekend door 2500 Monte Carlo simulaties te draaien met jaarlijkse inleg €${(params.inlegJaarlijksPrive ?? 0).toLocaleString()}/jaar en rendement ${((params.meanReturn ?? 0.097)*100).toFixed(1)}%.`} />
+                <InfoTip text={`Normaal scenario (verwachte portefeuillewaarde) op leeftijd ${pensioenLeeftijd} jaar, op basis van 2500 doorgerekende scenario's. Berekend door 2500 doorgerekende scenario's te draaien met jaarlijkse inleg €${(params.inlegJaarlijksPrive ?? 0).toLocaleString()}/jaar en rendement ${((params.meanReturn ?? 0.097)*100).toFixed(1)}%.`} />
               </div>
               <div className="kpi-value">{priveOpPensioendag > 0 ? fmt(priveOpPensioendag) : '—'}</div>
-              <div className="kpi-sub">mediaan · leeftijd {pensioenLeeftijd}j</div>
+              <div className="kpi-sub">normaal scenario · leeftijd {pensioenLeeftijd}j</div>
             </div>
             <div className="kpi gold">
               <div className="kpi-label">{partnerActief ? 'Gezamenlijke inleg' : 'Jaarlijkse inleg'}</div>
@@ -152,7 +152,7 @@ export default function Dashboard({
             <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
               <div className="kpi-label">
                 Kans succes
-                <InfoTip text="% simulaties waarbij je portefeuille > 0 is op leeftijd 85 (2500 Monte Carlo paden)." />
+                <InfoTip text="% simulaties waarbij je portefeuille > 0 is op leeftijd 85 (2500 doorgerekende scenario's)." />
               </div>
               <div className="kpi-value" style={{ color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
                 {kansSucces}%
@@ -181,7 +181,7 @@ export default function Dashboard({
             <div className="kpi" style={{ borderTop: '2px solid var(--green)' }}>
               <div className="kpi-label">
                 Kans succes
-                <InfoTip text="% simulaties waarbij BV > 0 op leeftijd 85 (2500 Monte Carlo paden, 80e percentiel veiligheidsgrens)." />
+                <InfoTip text="% simulaties waarbij BV > 0 op leeftijd 85 (2500 doorgerekende scenario's, 80e percentiel veiligheidsgrens)." />
               </div>
               <div className="kpi-value" style={{ color: kansSucces >= 80 ? 'var(--green)' : kansSucces >= 60 ? 'var(--amber)' : 'var(--red)' }}>
                 {kansSucces}%
@@ -198,7 +198,7 @@ export default function Dashboard({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.25rem' }}>
-                Maandelijkse onttrekking (P50)
+                Maandelijkse onttrekking
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--green)', lineHeight: 1 }}>
                 €{maandelijksOnttrektbaar.toLocaleString('nl-NL')}
@@ -370,7 +370,7 @@ export default function Dashboard({
           <div className="card-header">
             <div>
               <div className="card-title">Verwachte portefeuillegroei</div>
-              <div className="card-subtitle">Mediaan (P50) · Monte Carlo 2500 simulaties</div>
+              <div className="card-subtitle">Normaal scenario · 2500 doorgerekende scenario's</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
@@ -405,9 +405,9 @@ export default function Dashboard({
               {pkStreefVal > 0 && <ReferenceLine y={pkStreefVal} stroke="var(--green)" strokeDasharray="3 4" strokeOpacity={0.6} label={{ value: 'Streef', position: 'insideTopLeft', fill: 'var(--green)', fontSize: 9, fontFamily: 'var(--font-mono)' }} />}
               {pkComfort > 0 && <ReferenceLine y={pkComfort} stroke="var(--amber)" strokeDasharray="3 4" strokeOpacity={0.6} label={{ value: 'Comfort', position: 'insideTopLeft', fill: 'var(--amber)', fontSize: 9, fontFamily: 'var(--font-mono)' }} />}
               {!isPrive && (
-                <Area dataKey="bvP50" name="BV (P50)" stroke="var(--accent)" fill="url(#gradBV)" strokeWidth={2} dot={false} />
+                <Area dataKey="bvP50" name="BV (normaal)" stroke="var(--accent)" fill="url(#gradBV)" strokeWidth={2} dot={false} />
               )}
-              <Area dataKey="priveP50" name={isPrive ? 'Portefeuille (P50)' : 'Privé (P50)'} stroke="var(--green)" fill="url(#gradPrive)" strokeWidth={2} dot={false} />
+              <Area dataKey="priveP50" name={isPrive ? 'Portefeuille (normaal)' : 'Privé (normaal)'} stroke="var(--green)" fill="url(#gradPrive)" strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -426,8 +426,8 @@ export default function Dashboard({
         marginBottom: '1.25rem',
       }}>
         {isPrive
-          ? '💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als het minimale privévermogen waarbij 80% van de paden de portefeuille in stand houdt tot leeftijd 85.'
-          : '💡 De countdown gebruikt 2500 Monte Carlo paden. Doelkapitalen zijn berekend als het minimale BV-bedrag waarbij 80% van de paden de BV in stand houdt tot leeftijd 85.'
+          ? "💡 De countdown gebruikt 2500 doorgerekende scenario's. Doelkapitalen zijn berekend als het minimale privévermogen waarbij 80% van de scenario's de portefeuille in stand houdt tot leeftijd 85."
+          : "💡 De countdown gebruikt 2500 doorgerekende scenario's. Doelkapitalen zijn berekend als het minimale BV-bedrag waarbij 80% van de scenario's de BV in stand houdt tot leeftijd 85."
         }
         {' '}Voeg portefeuille-updates toe via <b>Voortgang</b> om de projectie actueel te houden.
       </div>
@@ -445,8 +445,8 @@ export default function Dashboard({
           <div style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             {[
               {
-                label: 'Monte Carlo',
-                text: '2500 willekeurige paden, elk met jaarlijkse return uit N(μ, σ). Mediaan (P50) is de middelste uitkomst.',
+                label: 'Simulatie',
+                text: "2500 doorgerekende scenario's, elk met jaarlijkse return uit N(μ, σ). Normaal scenario is de middelste uitkomst.",
               },
               {
                 label: 'Doelkapitaal (Comfort)',

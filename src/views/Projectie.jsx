@@ -28,7 +28,7 @@ export default function Projectie({
 }) {
   const isPrive = userType === 'prive';
   const [tabIndex, setTabIndex] = useState(0);
-  const TABS = ['Portfolio', 'Doelcurves', 'Percentielband', 'Tabel'];
+  const TABS = ['Portfolio', 'Doelcurves', 'Uitkomstbandbreedte', 'Tabel'];
 
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
@@ -111,8 +111,8 @@ export default function Projectie({
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">{isPrive ? 'Portefeuille (mediaan)' : 'BV + Privé portefeuille (mediaan)'}</div>
-              <div className="card-subtitle">P50 · 2500 Monte Carlo paden · €nominaal</div>
+              <div className="card-title">{isPrive ? 'Portefeuille (normaal scenario)' : 'BV + Privé portefeuille (normaal scenario)'}</div>
+              <div className="card-subtitle">Normaal scenario · 2500 doorgerekende scenario's · €nominaal</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={320}>
@@ -132,8 +132,8 @@ export default function Projectie({
               <YAxis tickFormatter={v => v>=1e6?`€${(v/1e6).toFixed(1)}M`:`€${Math.round(v/1000)}K`} tick={{ fontFamily:'var(--font-mono)', fontSize:10, fill:'var(--text-3)' }} axisLine={false} tickLine={false} width={60}/>
               <Tooltip content={<ChartTip/>}/>
               <ReferenceLine x={pensioenJaar} stroke="var(--amber)" strokeDasharray="4 3"/>
-              {!isPrive && <Area dataKey="bvP50"    name="BV (P50)"    stroke="var(--accent)" fill="url(#gBV)" strokeWidth={2} dot={false}/>}
-              <Area dataKey="priveP50" name={isPrive ? 'Portefeuille (P50)' : 'Privé (P50)'} stroke="var(--green)" fill="url(#gPv)" strokeWidth={2} dot={false}/>
+              {!isPrive && <Area dataKey="bvP50"    name="BV (normaal)"    stroke="var(--accent)" fill="url(#gBV)" strokeWidth={2} dot={false}/>}
+              <Area dataKey="priveP50" name={isPrive ? 'Portefeuille (normaal)' : 'Privé (normaal)'} stroke="var(--green)" fill="url(#gPv)" strokeWidth={2} dot={false}/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -145,14 +145,14 @@ export default function Projectie({
           <div className="card-header">
             <div>
               <div className="card-title">Portefeuille vs. doelcurves</div>
-              <div className="card-subtitle">Totaal P50 vs. benodigde kapitaalcurves per tier</div>
+              <div className="card-subtitle">Totaal normaal scenario vs. benodigde kapitaalcurves per tier</div>
             </div>
           </div>
           <div style={{ display:'flex', gap:'1rem', flexWrap:'wrap', marginBottom:'0.75rem', fontFamily:'var(--font-mono)', fontSize:'0.72rem' }}>
             <span style={{ color:'var(--accent)' }}>── Floor</span>
             <span style={{ color:'var(--green)'  }}>── Streef</span>
             <span style={{ color:'var(--amber)'  }}>── Comfort</span>
-            <span style={{ color:'var(--text-3)' }}>--- Totaal P50</span>
+            <span style={{ color:'var(--text-3)' }}>--- Totaal normaal</span>
           </div>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={chartData} margin={{ top:8, right:8, bottom:8, left:0 }}>
@@ -164,7 +164,7 @@ export default function Projectie({
               <Line dataKey="doelCurveVloer"  name="Doel floor"   stroke="var(--accent)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/>
               <Line dataKey="doelCurveStreef" name="Doel streef"  stroke="var(--green)"  strokeDasharray="5 3" dot={false} strokeWidth={1.5}/>
               <Line dataKey="doelCurve"       name="Doel comfort" stroke="var(--amber)"  strokeDasharray="6 3" dot={false} strokeWidth={1.5}/>
-              <Line dataKey="totaalP50"       name="Totaal P50"   stroke="var(--text-2)" strokeDasharray="2 2" dot={false} strokeWidth={2}/>
+              <Line dataKey="totaalP50"       name="Totaal normaal"   stroke="var(--text-2)" strokeDasharray="2 2" dot={false} strokeWidth={2}/>
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -175,8 +175,8 @@ export default function Projectie({
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">{isPrive ? 'Portefeuille percentielband (P25–P75)' : 'Totaal portefeuille percentielband (P25–P75)'}</div>
-              <div className="card-subtitle">Onzekerheidsrange rond mediaan (P50) · €nominaal</div>
+              <div className="card-title">{isPrive ? 'Portefeuille uitkomstbandbreedte (tegenvallend–meevallend)' : 'Totaal portefeuille uitkomstbandbreedte (tegenvallend–meevallend)'}</div>
+              <div className="card-subtitle">Onzekerheidsrange rond normaal scenario · €nominaal</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={320}>
@@ -192,9 +192,9 @@ export default function Projectie({
               <YAxis tickFormatter={v => v>=1e6?`€${(v/1e6).toFixed(1)}M`:`€${Math.round(v/1000)}K`} tick={{ fontFamily:'var(--font-mono)', fontSize:10, fill:'var(--text-3)' }} axisLine={false} tickLine={false} width={60}/>
               <Tooltip content={<ChartTip/>}/>
               <ReferenceLine x={pensioenJaar} stroke="var(--amber)" strokeDasharray="4 3"/>
-              <Area dataKey={isPrive ? 'priveP75' : 'totaalP75'} name="P75" stroke="none" fill="url(#gBand)" dot={false}/>
-              <Area dataKey={isPrive ? 'priveP50' : 'totaalP50'} name="P50" stroke="var(--green)" fill="none" strokeWidth={2} dot={false}/>
-              <Area dataKey={isPrive ? 'priveP25' : 'totaalP25'} name="P25" stroke="none" fill="var(--bg)" dot={false}/>
+              <Area dataKey={isPrive ? 'priveP75' : 'totaalP75'} name="meevallend" stroke="none" fill="url(#gBand)" dot={false}/>
+              <Area dataKey={isPrive ? 'priveP50' : 'totaalP50'} name="normaal" stroke="var(--green)" fill="none" strokeWidth={2} dot={false}/>
+              <Area dataKey={isPrive ? 'priveP25' : 'totaalP25'} name="tegenvallend" stroke="none" fill="var(--bg)" dot={false}/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -214,19 +214,19 @@ export default function Projectie({
                   <th>Lft</th>
                   {isPrive ? (
                     <>
-                      <th className="num">P25</th>
-                      <th className="num">P50</th>
-                      <th className="num">P75</th>
+                      <th className="num">Tegenvallend</th>
+                      <th className="num">Normaal</th>
+                      <th className="num">Meevallend</th>
                     </>
                   ) : (
                     <>
-                      <th className="num">BV P25</th>
-                      <th className="num">BV P50</th>
-                      <th className="num">BV P75</th>
-                      <th className="num">Privé P50</th>
+                      <th className="num">BV tegenvallend</th>
+                      <th className="num">BV normaal</th>
+                      <th className="num">BV meevallend</th>
+                      <th className="num">Privé normaal</th>
                     </>
                   )}
-                  <th className="num">Totaal P50</th>
+                  <th className="num">Totaal normaal</th>
                   <th className="num">Doel comfort</th>
                 </tr>
               </thead>
