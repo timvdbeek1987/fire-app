@@ -84,39 +84,20 @@ export default function Dashboard({
   const inflatieTable = useMemo(() => {
     if (!maandelijksOnttrektbaar) return [];
     const eindLft = inflatieCorrectie ? uitputtingLftMO : uitputtingNominaalLft;
-    // Kies stap zodat tabel max ~5 rijen heeft
-    const periode = eindLft - pensioenLeeftijdMO;
-    const stap = periode <= 30 ? 10 : periode <= 50 ? 10 : 15;
-    const rows = [];
-    for (let lft = pensioenLeeftijdMO; lft <= eindLft; lft += stap) {
+    const row = (lft, isEinde = false) => {
       const jarenVandaag = lft - (CURRENT_YEAR - birthYear);
       const cumInf = Math.pow(1 + infMO, Math.max(0, jarenVandaag));
-      rows.push({
-        lft,
+      return {
+        lft, isEinde,
         nominaal: inflatieCorrectie
           ? Math.round(maandelijksOnttrektbaar * cumInf)
           : nominaalVastBedrag,
         reeel: inflatieCorrectie
           ? maandelijksOnttrektbaar
           : Math.round(nominaalVastBedrag / cumInf),
-      });
-    }
-    // Voeg eindrij toe als die er niet al in zit
-    if (rows.length === 0 || rows[rows.length - 1].lft < eindLft) {
-      const jarenVandaag = eindLft - (CURRENT_YEAR - birthYear);
-      const cumInf = Math.pow(1 + infMO, Math.max(0, jarenVandaag));
-      rows.push({
-        lft: eindLft,
-        nominaal: inflatieCorrectie
-          ? Math.round(maandelijksOnttrektbaar * cumInf)
-          : nominaalVastBedrag,
-        reeel: inflatieCorrectie
-          ? maandelijksOnttrektbaar
-          : Math.round(nominaalVastBedrag / cumInf),
-        isEinde: true,
-      });
-    }
-    return rows;
+      };
+    };
+    return [row(pensioenLeeftijdMO), row(eindLft, true)];
   }, [inflatieCorrectie, maandelijksOnttrektbaar, nominaalVastBedrag,
       pensioenLeeftijdMO, uitputtingLftMO, uitputtingNominaalLft, infMO, birthYear]);
   const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
