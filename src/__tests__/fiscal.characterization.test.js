@@ -906,11 +906,12 @@ describe('L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking (2026-pa
     //   FOUT:   Math.round(vrh_nop) − Math.round(vrh_met) = 9841 − 8760 = 1081
     //   JUIST:  Math.round(vrh_nop − vrh_met)             = Math.round(1080,392) = 1080
     //
-    //   Oorzaak: vrh_nop (fractie 0,568 > 0,5) rondt ÓP → +0,432 inflatie in verschil
-    //            vrh_met (fractie 0,175 < 0,5) rondt AF → +0,175 inflatie in verschil
-    //            gecombineerd: +0,432 + 0,175 = +0,607 → duwt 1080,392 + 0,607 = 1081
-    //            exact voorbij de 0,5-grens → "verschil van afgeronde waarden" geeft 1081,
-    //            "afgerond verschil" geeft 1080; de test gebruikte de eerste (fout) methode.
+    //   Oorzaak: apart-afronden-dan-aftrekken ≠ aftrekken-dan-afronden wanneer de twee
+    //            fracties aan weerszijden van 0,5 vallen:
+    //              vrh_nop fractie 0,568 > 0,5 → rondt omhoog naar 9841
+    //              vrh_met fractie 0,175 < 0,5 → rondt omlaag naar 8760
+    //            Foutieve methode: round(9840,568) − round(8760,175) = 9841 − 8760 = 1081
+    //            Correcte methode: round(9840,568 − 8760,175)        = round(1080,392) = 1080
     //
     // Correcte assertiemethode: Math.round(onafgerond Δ) per component, dan optellen.
     // 4475 + 1080 = 5555 = totaalverschil — algebraïsch sluitend.
