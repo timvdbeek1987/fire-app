@@ -1,15 +1,21 @@
 /**
  * FISCALE PARAMETERS — geversioneerde bron van waarheid
  *
- * Elke parameter draagt: waarde, belastingjaar, bron (URL), geverifieerd_op (datum).
- * Wijzig alleen na verificatie tegen de genoemde bron.
+ * Elke parameter draagt:
+ *   waarde          — getal
+ *   bron            — URL naar officiële publicatie
+ *   geverifieerd    — bool: true = handmatig gecontroleerd; false = vereenvoudiging of te verifiëren
+ *   belastingjaar   — int: het jaar waarvoor de waarde geldt
+ *   verversings_cadans — 'jaarlijks' | 'halfjaarlijks': hoe vaak de waarde hercontroleerd moet worden
+ *   toelichting     — optioneel: modelkeuze of beperking
  *
- * GEBRUIK: importeer `getFiscaleParams()` — nooit waarden direct hardcoden.
+ * Wijzig alleen na verificatie tegen de genoemde bron.
+ * GEBRUIK: importeer `getFiscaleWaarden()` — nooit waarden direct hardcoden.
  */
 
 export const FISCALE_PARAMS_2026 = {
   belastingjaar: 2026,
-  geverifieerd_op: '2026-05-15',  // datum van laatste verificatie
+  geverifieerd_op: '2026-05-15',  // datum van laatste verificatie van de gehele set
 
   // ── VPB ──────────────────────────────────────────────────────────────────
   vpbTariefLaag: {
@@ -17,18 +23,21 @@ export const FISCALE_PARAMS_2026 = {
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/zakelijk/winst/vennootschapsbelasting/hoeveel-vennootschapsbelasting-betaalt-u',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   vpbGrens: {
     waarde: 200000,
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/zakelijk/winst/vennootschapsbelasting/hoeveel-vennootschapsbelasting-betaalt-u',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   vpbTariefHoog: {
     waarde: 0.258,
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/zakelijk/winst/vennootschapsbelasting/hoeveel-vennootschapsbelasting-betaalt-u',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
 
   // ── Box 2 ─────────────────────────────────────────────────────────────────
@@ -37,18 +46,21 @@ export const FISCALE_PARAMS_2026 = {
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/inkomen_uit_aanmerkelijk_belang',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   box2Grens: {
     waarde: 68843,
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/inkomen_uit_aanmerkelijk_belang',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   box2TariefHoog: {
     waarde: 0.31,
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/inkomen_uit_aanmerkelijk_belang',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
 
   // ── Dividendbelasting (bronheffing — 15% voorheffing, verrekenbaar met box 2) ──
@@ -57,6 +69,7 @@ export const FISCALE_PARAMS_2026 = {
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/zakelijk/winst/dividendbelasting',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
     toelichting: 'Bronheffing door BV in te houden; verrekenbaar met box 2-heffing van de aandeelhouder. Netto box 2-last = box2TariefLaag/Hoog - 15%, maar cashflow-effect voor de aandeelhouder = box2-tarief (BV houdt 15% in, aandeelhouder verrekent).',
   },
 
@@ -69,18 +82,21 @@ export const FISCALE_PARAMS_2026 = {
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/belasting_berekenen_over_uw_inkomen',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   heffingsvrijVermogen: {
     waarde: 59357,  // per persoon; ×2 bij fiscaal partner
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   box3ForfaitOverigeBezittingen: {
     waarde: 0.060,  // fictief rendement beleggingen/overige bezittingen — definitief 2026
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
     geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
     toelichting: 'Definitief gepubliceerd forfait overige bezittingen 2026.',
   },
   box3ForfaitSpaargeld: {
@@ -88,12 +104,15 @@ export const FISCALE_PARAMS_2026 = {
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
     geverifieerd: false,  // ⚠️ voorlopig — definitieve waarde volgt na belastingaanslagen
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
   box3ForfaitSchulden: {
-    waarde: 0.028,  // fictief rendement schulden (negatief) — VOORLOPIG 2026
+    waarde: 0.028,  // fictief rendement schulden — VOORLOPIG 2026
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
-    geverifieerd: false,  // ⚠️ voorlopig — definitieve waarde volgt na belastingaanslagen
+    geverifieerd: false,  // ⚠️ voorlopig — buiten geverifieerde band (~2,6–2,7%); te corrigeren bij definitieve vaststelling
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
+    toelichting: 'Voorlopig 2026; valt buiten geverifieerde band van ~2,6–2,7%. Corrigeren zodra Belastingdienst definitief forfait publiceert.',
   },
   // Afgeleid effectief tarief: box3ForfaitOverigeBezittingen × box3Tarief = 6,0% × 36% = 2,16%
   // Gebruikt in engine als benadering voor een beleg-dominant privé-portfolio.
@@ -103,38 +122,45 @@ export const FISCALE_PARAMS_2026 = {
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
     geverifieerd: true,  // afgeleid van twee geverifieerde componenten; zie toelichting
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
     toelichting: 'Vereenvoudiging, forfaitair — tegenbewijsregeling niet gemodelleerd. Effectief: forfait overige bezittingen (6,0% definitief) × IB-tarief (36%). Spaargeld-/schulden-forfaits apart opgeslagen als voorlopig.',
   },
 
   // ── Inkomstenbelasting / DGA ───────────────────────────────────────────────
-  // ⚠️ TE VERIFIËREN — effectief marginaal tarief; sterk afhankelijk van persoonlijke situatie
   inkomstenbelasting: {
     waarde: 0.43,
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/belasting_berekenen_over_uw_inkomen',
-    geverifieerd: false,  // ⚠️ effectief tarief — afhankelijk van aftrekposten, kortingen; te verifiëren met accountant
+    geverifieerd: false,  // ⚠️ structurele vereenvoudiging van progressieve schaal — te vervangen; niet instelbaar via deze nullijn
     belastingjaar: 2026,
-    toelichting: 'Effectief marginaal tarief box 1. Stel in op eigen situatie (via Instellingen).',
+    verversings_cadans: 'jaarlijks',
+    toelichting: 'Structurele vereenvoudiging van progressieve schaal — te vervangen. Plat effectief tarief ignoreert aftrekposten, heffingskortingen en schijfsprongen. Instelling via Instellingen-scherm; accountant-verificatie noodzakelijk.',
   },
   gebruikelijkLoon: {
-    waarde: 56000,  // norm gebruikelijk loon 2025 (2026 te verifiëren)
+    waarde: 58000,  // DGA-norm gebruikelijk loon 2026 (belastingdienst.nl)
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/zakelijk/personeel_en_loon/gebruikelijk_loon',
-    geverifieerd: false,  // ⚠️ te verifiëren voor 2026
+    geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'jaarlijks',
   },
 
   // ── AOW ───────────────────────────────────────────────────────────────────
-  // ⚠️ TE VERIFIËREN — AOW-bedragen worden halfjaarlijks geïndexeerd
+  // AOW-bedragen worden halfjaarlijks geïndexeerd (januari en juli).
+  // Cadans: 'halfjaarlijks' — banner slaat alarm bij > 6 maanden zonder hercontrole.
   aowBedragAlleenstaand: {
-    waarde: 16680,  // netto p/j indicatief 2025; 2026 te verifiëren
+    waarde: 18700,  // netto p/j, alleenstaand, met loonheffingskorting — januari 2026 (svb.nl)
     bron: 'https://www.svb.nl/nl/aow/hoogte-aow',
-    geverifieerd: false,  // ⚠️ te verifiëren voor 2026 (halfjaarlijkse indexatie)
+    geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'halfjaarlijks',
+    toelichting: 'Netto jaarbedrag inclusief loonheffingskorting, peildatum januari 2026. Hercontroleer bij elke SVB-indexatie (januari en juli).',
   },
   aowBedragPartner: {
-    waarde: 11520,  // netto p/j indicatief (per partner) 2025; te verifiëren
+    waarde: 12800,  // netto p/j per persoon, met partner, met loonheffingskorting — januari 2026 (svb.nl)
     bron: 'https://www.svb.nl/nl/aow/hoogte-aow',
-    geverifieerd: false,  // ⚠️ te verifiëren voor 2026
+    geverifieerd: true,
     belastingjaar: 2026,
+    verversings_cadans: 'halfjaarlijks',
+    toelichting: 'Netto jaarbedrag per persoon inclusief loonheffingskorting, peildatum januari 2026. Hercontroleer bij elke SVB-indexatie (januari en juli).',
   },
 };
 
@@ -157,8 +183,17 @@ export function getFiscaleWaarden(set = ACTIEVE_FISCALE_PARAMS) {
 }
 
 /**
- * Controleert of de parameterset verouderd is.
- * Returns: { verouderd: bool, reden: string | null }
+ * Controleert of de parameterset (deels) verouderd is.
+ *
+ * Returns {
+ *   verouderd: bool,          — true als minstens één item stale is
+ *   reden: string | null,     — eerste/meest urgente reden (backward-compat)
+ *   items: Array<{            — alle individuele waarschuwingen
+ *     type: 'verkeerd_jaar' | 'halfjaarlijks_verlopen' | 'jaarlijks_verlopen',
+ *     params?: string[],      — betrokken parameternamen (halfjaarlijks)
+ *     reden: string,
+ *   }>
+ * }
  */
 export function checkStaleness(set = ACTIEVE_FISCALE_PARAMS) {
   const nu = new Date();
@@ -166,17 +201,47 @@ export function checkStaleness(set = ACTIEVE_FISCALE_PARAMS) {
   const geverificeerdOp = new Date(set.geverifieerd_op);
   const maandenOud = (nu - geverificeerdOp) / (1000 * 60 * 60 * 24 * 30.44);
 
+  const items = [];
+
+  // 1. Verkeerd belastingjaar — meest urgent
   if (huidigJaar > set.belastingjaar) {
-    return {
-      verouderd: true,
+    items.push({
+      type: 'verkeerd_jaar',
       reden: `Fiscale regels zijn van belastingjaar ${set.belastingjaar} — het is nu ${huidigJaar}. Controleer of de tarieven nog geldig zijn.`,
-    };
+    });
   }
+
+  // 2. Halfjaarlijkse parameters verlopen (> 6 maanden)
+  if (maandenOud > 6) {
+    const halfjaarParams = Object.entries(set)
+      .filter(([k, v]) =>
+        typeof v === 'object' &&
+        v !== null &&
+        'verversings_cadans' in v &&
+        v.verversings_cadans === 'halfjaarlijks'
+      )
+      .map(([k]) => k);
+
+    if (halfjaarParams.length > 0) {
+      items.push({
+        type: 'halfjaarlijks_verlopen',
+        params: halfjaarParams,
+        reden: `AOW-bedragen (${halfjaarParams.join(', ')}) zijn ${Math.round(maandenOud)} maanden geleden gecontroleerd — halfjaarlijkse indexatie (jan/jul). Verifieer op svb.nl.`,
+      });
+    }
+  }
+
+  // 3. Algemeen te oud (> 12 maanden) — jaarlijkse parameters
   if (maandenOud > 12) {
-    return {
-      verouderd: true,
-      reden: `Fiscale parameters zijn ${Math.round(maandenOud)} maanden geleden gecontroleerd (${set.geverifieerd_op}). Verifieer met je accountant.`,
-    };
+    items.push({
+      type: 'jaarlijks_verlopen',
+      reden: `Alle fiscale parameters zijn ${Math.round(maandenOud)} maanden geleden gecontroleerd (${set.geverifieerd_op}). Verifieer tarieven voor het nieuwe belastingjaar.`,
+    });
   }
-  return { verouderd: false, reden: null };
+
+  return {
+    verouderd: items.length > 0,
+    reden: items.length > 0 ? items[0].reden : null,
+    items,
+  };
 }

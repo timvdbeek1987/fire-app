@@ -45,11 +45,11 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
 
   return (
     <div className="fade-up">
-      {staleness.verouderd && (
-        <div style={{ padding: '0.75rem 1rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--r)', marginBottom: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: '#dc2626' }}>
-          ⚠️ {staleness.reden}
+      {staleness.items?.map((item, i) => (
+        <div key={i} style={{ padding: '0.75rem 1rem', background: item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.08)', border: `1px solid ${item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.35)'}`, borderRadius: 'var(--r)', marginBottom: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: item.type === 'verkeerd_jaar' ? '#dc2626' : '#b45309' }}>
+          {item.type === 'verkeerd_jaar' ? '🚨' : '⚠️'} {item.reden}
         </div>
-      )}
+      ))}
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Configuratie</div>

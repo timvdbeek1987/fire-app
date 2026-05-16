@@ -178,11 +178,11 @@ export default function Dashboard({
 
   return (
     <div>
-      {stalenessCheck.verouderd && (
-        <div style={{ padding: '0.5rem 0.8rem', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--r)', marginBottom: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#dc2626' }}>
-          ⚠️ {stalenessCheck.reden}
+      {stalenessCheck.items?.map((item, i) => (
+        <div key={i} style={{ padding: '0.5rem 0.8rem', background: item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.08)', border: `1px solid ${item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`, borderRadius: 'var(--r)', marginBottom: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: item.type === 'verkeerd_jaar' ? '#dc2626' : '#b45309' }}>
+          {item.type === 'verkeerd_jaar' ? '🚨' : '⚠️'} {item.reden}
         </div>
-      )}
+      ))}
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Dashboard</div>
