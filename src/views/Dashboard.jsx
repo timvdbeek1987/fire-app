@@ -45,13 +45,15 @@ export default function Dashboard({
   birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
   partnerActief = false, hasPartner = false, onPartnerToggle,
   vermogenUpdates = [],
+  onParamsChange,   // persistentiepad — zelfde als Instellingen (fire_data.params via App.saveParams)
 }) {
   const [showCalc, setShowCalc] = useState(false);
   const [showOnttrekking, setShowOnttrekking] = useState(false);
   const [inflatieCorrectie, setInflatieCorrectie] = useState(true);
-  // Waterfall (1c-ii): instelbare latente VPB-aanname
-  const [latenteVpbActief, setLatenteVpbActief] = useState(true);   // conservatieve default: aan
-  const [latenteVpbPct, setLatenteVpbPct]       = useState(30);     // % van BV als ongerealiseerde winst
+  // Waterfall (1c-ii): instelbare latente VPB-aanname.
+  // Initialisatie vanuit params zodat na reload/herlogin dezelfde aanname actief is.
+  const [latenteVpbActief, setLatenteVpbActief] = useState(() => params.latenteVpbActief ?? true);
+  const [latenteVpbPct, setLatenteVpbPct]       = useState(() => params.latenteVpbPct    ?? 30);
   const [wfExpand, setWfExpand] = useState(new Set());
   const toggleWf = key => setWfExpand(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const isPrive = userType === 'prive';
@@ -350,7 +352,12 @@ export default function Dashboard({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
                     <span>Aanname actief</span>
                     <button
-                      onClick={e => { e.stopPropagation(); setLatenteVpbActief(v => !v); }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        const nieuw = !latenteVpbActief;
+                        setLatenteVpbActief(nieuw);
+                        onParamsChange?.({ ...params, latenteVpbActief: nieuw, latenteVpbPct });
+                      }}
                       style={{ padding: '0.15rem 0.5rem', borderRadius: 10, border: `1.5px solid ${latenteVpbActief ? 'var(--red)' : 'var(--border)'}`, background: latenteVpbActief ? 'rgba(239,68,68,0.08)' : 'var(--surface-2)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: latenteVpbActief ? 'var(--red)' : 'var(--text-3)' }}
                     >
                       {latenteVpbActief ? '● aan' : '○ uit'}
@@ -364,7 +371,11 @@ export default function Dashboard({
                           type="number" min={0} max={100} step={5}
                           value={latenteVpbPct}
                           onClick={e => e.stopPropagation()}
-                          onChange={e => setLatenteVpbPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          onChange={e => {
+                            const nieuw = Math.max(0, Math.min(100, Number(e.target.value)));
+                            setLatenteVpbPct(nieuw);
+                            onParamsChange?.({ ...params, latenteVpbActief, latenteVpbPct: nieuw });
+                          }}
                           style={{ width: 56, padding: '0.15rem 0.3rem', border: '1px solid var(--border)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: '0.65rem', background: 'var(--surface-2)', color: 'var(--text)' }}
                         />
                         <span>%</span>

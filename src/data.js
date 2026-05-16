@@ -115,6 +115,26 @@ export const BASE_PARAMS = {
   uitputtingsLeeftijd:        90,
   // 2028-schakelaar werkelijk rendementstelsel — 0 = uit (forfait ongewijzigd doorgetrokken)
   box3WerkelijkRendement2028: 0,
+
+  // ── Gebruikerssituatie-flags ──────────────────────────────────────────────
+  // Dit zijn eigenschappen van de fiscale positie van de gebruiker, GEEN tariefparameters
+  // uit de belastingwetgeving. Ze hebben geen peildatum en zijn niet via paramsToSeed te hashen.
+  // Ze beïnvloeden wél fiscale berekeningen — ze kwalificeren de structuur, niet de tarieven.
+  //
+  // fiscaalPartner: verdubbelt de box 2-drempel (×2 × box2Grens) én het heffingsvrijvermogen
+  //   (×2 × heffingsvrijVermogen) conform Wet IB 2001 art. 5a.
+  //   Losstaat van partnerActief (= vermogen samenvoegen voor projectie).
+  //   Mag NOOIT automatisch worden afgeleid uit partnerActief — het zijn juridisch
+  //   verschillende begrippen: fiscaal partnerschap vereist huwelijk, geregistreerd
+  //   partnerschap of specifieke samenwoningscriteria.
+  fiscaalPartner:             false,
+
+  // latenteVpbActief / latenteVpbPct: aanname ongerealiseerde koerswinst in BV.
+  //   latenteVpbActief = true  → ongerealiseerdeWinstBV = bvNu × latenteVpbPct/100
+  //   latenteVpbActief = false → ongerealiseerdeWinstBV = 0  (excl. latente VPB)
+  //   Bewaard als gebruikersparameter zodat het hero-getal reproduceerbaar is na reload.
+  latenteVpbActief:           true,
+  latenteVpbPct:              30,
 };
 
 // ============================================================

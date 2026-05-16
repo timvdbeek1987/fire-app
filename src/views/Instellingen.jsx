@@ -303,6 +303,32 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
                 help="Gemiddelde jaarlijkse bijdrage van partner"/>
             </>
           )}
+
+          {/* Fiscaal partnerschap — bewust gescheiden van partnerActief hierboven.
+              partnerActief = vermogen samenvoegen voor projectie (functioneel begrip).
+              fiscaalPartner = fiscaalrechtelijk partnerschap conform Wet IB art. 5a
+                               (vereist huwelijk, geregistreerd partnerschap of
+                               specifieke samenwoningscriteria — NIET automatisch
+                               gelijk aan partnerActief). */}
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+            <div className="form-group">
+              <label className="form-label">Fiscaal partner (Wet IB art. 5a)</label>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                {[{ v: false, l: 'Nee' }, { v: true, l: 'Ja' }].map(({ v, l }) => (
+                  <button key={String(v)} type="button"
+                    onClick={() => set('fiscaalPartner')(v)}
+                    style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--r)', border: `1.5px solid ${(local.fiscaalPartner ?? false) === v ? 'var(--accent)' : 'var(--border)'}`, background: (local.fiscaalPartner ?? false) === v ? 'var(--accent-soft)' : 'var(--surface)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}
+                  >{l}</button>
+                ))}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.64rem', color: 'var(--ink-muted)', marginTop: '0.35rem', fontStyle: 'italic', lineHeight: 1.55 }}>
+                Verdubbelt de box 2-drempel (2 × €{(local.box2Grens ?? 68843).toLocaleString('nl-NL')}) en het
+                heffingsvrijvermogen (2 × €{(local.heffingsvrijVermogen ?? 59357).toLocaleString('nl-NL')}).
+                Losstaat van "Partner toevoegen" hierboven — dat betreft het samenvoegen van
+                vermogens voor de projectie, niet het fiscaalrechtelijk partnerschap.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
