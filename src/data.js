@@ -281,6 +281,96 @@ export function bruterDividendBox2(nettoNodig, p) {
 }
 
 /**
+ * Berekent de §5.2-waterfall: netto besteedbaar vandaag vanuit bruto BV-vermogen.
+ *
+ * Samenstelling van bestaande afgetekende functies — geen nieuwe fiscale regels:
+ *   Stap 1  Latente VPB op ongerealiseerde koerswinst (getrapt 19% / 25,8% over €200K-grens)
+ *   Stap 2  BV na latente VPB
+ *   Stap 3  Latente box 2 op uitkeerbaar BV-vermogen (getrapt 24,5% / 31%, ×2 bij fiscaalPartner)
+ *   Stap 4  Privé netto = privévermogen − VRH (box3Heffing) + eigenwoningwaarde
+ *   Stap 5  Netto besteedbaar = bvNaVpb − latenteBox2 + priveNetto
+ *
+ * ongerealiseerdeWinstBV = 0 → stap 1 slaat over (label "excl. latente VPB" in UI).
+ * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
+ *
+ * @param {object} invoer
+ *   bvBruto                — marktwaarde BV-vermogen (€)
+ *   ongerealiseerdeWinstBV — aanname ongerealiseerde koerswinst in BV (€); 0 = excl. latente VPB
+ *   priveSpaar             — spaargeldcomponent privé-vermogen (€)
+ *   priveBeleg             — beleggingscomponent privé-vermogen (€)
+ *   wozWaarde              — WOZ-waarde eigen woning (€; 0 of weglaten als geen)
+ *   hypotheekRestschuld    — resterende hypotheekschuld (€)
+ *   p                      — params-object
+ * @returns {{ bvBruto, latenteVpb, bvNaVpb, latenteBox2, box2InLaag, box2InHoog,
+ *             priveVermogen, vrh, eigenWoningNetto, priveNetto, nettoBesteedbaar }}
+ */
+export function berekenNettoBesteedbaar({
+  bvBruto,
+  ongerealiseerdeWinstBV,
+  priveSpaar,
+  priveBeleg,
+  wozWaarde = 0,
+  hypotheekRestschuld = 0,
+  p,
+}) {
+  // ── Stap 1: latente VPB op ongerealiseerde koerswinst ──────────────────────
+  const vpbTariefLaag = vereist(p, 'vpbTariefLaag');
+  const vpbGrens      = vereist(p, 'vpbGrens');
+  const vpbTariefHoog = vereist(p, 'vpbTariefHoog');
+
+  let latenteVpb = 0;
+  if (ongerealiseerdeWinstBV > 0) {
+    const inLaag = Math.min(ongerealiseerdeWinstBV, vpbGrens);
+    const inHoog = Math.max(0, ongerealiseerdeWinstBV - vpbGrens);
+    latenteVpb   = inLaag * vpbTariefLaag + inHoog * vpbTariefHoog;
+  }
+
+  // ── Stap 2: BV na latente VPB ──────────────────────────────────────────────
+  const bvNaVpb = bvBruto - latenteVpb;
+
+  // ── Stap 3: latente box 2 (getrapt) op uitkeerbaar BV-vermogen ─────────────
+  // Richting: bruto BV → box 2-belasting; zelfde tarievenstructuur als bruterDividendBox2
+  // maar toegepast op een gegeven bruto-bedrag (geen grossering nodig).
+  const box2Grens      = vereist(p, 'box2Grens') * (p.fiscaalPartner ? 2 : 1);
+  const box2TariefLaag = vereist(p, 'box2TariefLaag');
+  const box2TariefHoog = vereist(p, 'box2TariefHoog');
+
+  let latenteBox2, box2InLaag, box2InHoog;
+  if (bvNaVpb <= box2Grens) {
+    box2InLaag  = bvNaVpb;
+    box2InHoog  = 0;
+    latenteBox2 = bvNaVpb * box2TariefLaag;
+  } else {
+    box2InLaag  = box2Grens;
+    box2InHoog  = bvNaVpb - box2Grens;
+    latenteBox2 = box2Grens * box2TariefLaag + (bvNaVpb - box2Grens) * box2TariefHoog;
+  }
+
+  // ── Stap 4: privé netto ────────────────────────────────────────────────────
+  const vrh              = box3Heffing(priveSpaar, priveBeleg, p);
+  const priveVermogen    = priveSpaar + priveBeleg;
+  const eigenWoningNetto = Math.max(0, (wozWaarde ?? 0) - (hypotheekRestschuld ?? 0));
+  const priveNetto       = priveVermogen - vrh + eigenWoningNetto;
+
+  // ── Stap 5: netto besteedbaar vandaag ──────────────────────────────────────
+  const nettoBesteedbaar = bvNaVpb - latenteBox2 + priveNetto;
+
+  return {
+    bvBruto,
+    latenteVpb,
+    bvNaVpb,
+    latenteBox2,
+    box2InLaag,
+    box2InHoog,
+    priveVermogen,
+    vrh,
+    eigenWoningNetto,
+    priveNetto,
+    nettoBesteedbaar,
+  };
+}
+
+/**
  * Berekent de jaarlijkse box 3-heffing (VRH) op basis van de werkelijke vermogenssplit.
  *
  * Volgt de Belastingdienst-systematiek stap voor stap (verificeerbaar tegen ambtelijke publicaties):

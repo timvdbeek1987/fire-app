@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import JaarTick from '../JaarTick.jsx';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { CheckCircle, Clock } from 'lucide-react';
-import { BASE_PARAMS, fmt, fmtFull, berekenVereistKapitaalAnalytisch } from '../data.js';
+import { BASE_PARAMS, fmt, fmtFull, berekenVereistKapitaalAnalytisch, berekenNettoBesteedbaar } from '../data.js';
 import { InfoTip } from '../Tooltip.jsx';
 import { checkStaleness } from '../fiscalParams.js';
 
@@ -49,6 +49,11 @@ export default function Dashboard({
   const [showCalc, setShowCalc] = useState(false);
   const [showOnttrekking, setShowOnttrekking] = useState(false);
   const [inflatieCorrectie, setInflatieCorrectie] = useState(true);
+  // Waterfall (1c-ii): instelbare latente VPB-aanname
+  const [latenteVpbActief, setLatenteVpbActief] = useState(true);   // conservatieve default: aan
+  const [latenteVpbPct, setLatenteVpbPct]       = useState(30);     // % van BV als ongerealiseerde winst
+  const [wfExpand, setWfExpand] = useState(new Set());
+  const toggleWf = key => setWfExpand(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const isPrive = userType === 'prive';
   const histRendement = berekenHistorischRendement(vermogenUpdates);
 
@@ -108,6 +113,23 @@ export default function Dashboard({
   const priveNu          = (start.prive ?? 0) + (partnerActief ? (params.partnerPriveNu ?? 0) : 0);
   const totaalNu         = bvNu + priveNu;
   const inlegGezamenlijk = (params.inlegJaarlijksPrive ?? 0) + (partnerActief ? (params.partnerInlegPrive ?? 0) : 0);
+
+  // Waterfall (1c-ii): netto besteedbaar vandaag — §5.2
+  const priveSpaarNu     = start.priveSpaar ?? 0;
+  const priveBelegNu     = Math.max(0, priveNu - priveSpaarNu);
+  const wozWaarde        = params.wozWaarde ?? 0;
+  const ongerealiseerdeWinstBV = latenteVpbActief ? Math.round(bvNu * latenteVpbPct / 100) : 0;
+  const waterfall = !isPrive && bvNu > 0
+    ? berekenNettoBesteedbaar({
+        bvBruto:               bvNu,
+        ongerealiseerdeWinstBV,
+        priveSpaar:            priveSpaarNu,
+        priveBeleg:            priveBelegNu,
+        wozWaarde,
+        hypotheekRestschuld:   params.hypotheekRestschuld ?? 0,
+        p:                     params,
+      })
+    : null;
   const currentAge       = CURRENT_YEAR - birthYear;
 
   // Countdown
@@ -281,6 +303,169 @@ export default function Dashboard({
           </>
         )}
       </div>
+
+      {/* ── Waterfall: Netto Besteedbaar Vandaag (1c-ii) ── */}
+      {!isPrive && waterfall && (
+        <div className="card" style={{ marginBottom: '1.25rem', borderTop: '3px solid var(--accent)' }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.2rem' }}>
+                Netto Besteedbaar Vandaag
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>
+                {fmt(Math.round(waterfall.nettoBesteedbaar))}
+              </div>
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-4)', textAlign: 'right', maxWidth: 280, lineHeight: 1.5 }}>
+              fiscale regels belastingjaar 2026, ongewijzigd doorgetrokken — toekomstige wijzigingen niet voorspeld
+            </div>
+          </div>
+
+          {/* Waterfall rows */}
+          {[
+            {
+              key:    'bv',
+              teken:  '',
+              label:  'Bruto BV',
+              bedrag: waterfall.bvBruto,
+              sub:    'marktwaarde zoals ingevoerd (liquide + beleggingen)',
+              detail: null,
+            },
+            {
+              key:    'vpb',
+              teken:  '−',
+              label:  latenteVpbActief
+                ? `Latente VPB (${latenteVpbPct}% koerswinst)`
+                : 'Latente VPB',
+              bedrag: waterfall.latenteVpb,
+              kleur:  'var(--red)',
+              sub:    latenteVpbActief
+                ? `19% / 25,8% over €${ongerealiseerdeWinstBV.toLocaleString('nl-NL')} ongerealiseerde winst`
+                : null,
+              subLabel: !latenteVpbActief ? 'excl. latente VPB — aanname uitgestaan' : null,
+              detail: (
+                <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+                    <span>Aanname actief</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); setLatenteVpbActief(v => !v); }}
+                      style={{ padding: '0.15rem 0.5rem', borderRadius: 10, border: `1.5px solid ${latenteVpbActief ? 'var(--red)' : 'var(--border)'}`, background: latenteVpbActief ? 'rgba(239,68,68,0.08)' : 'var(--surface-2)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: latenteVpbActief ? 'var(--red)' : 'var(--text-3)' }}
+                    >
+                      {latenteVpbActief ? '● aan' : '○ uit'}
+                    </button>
+                  </div>
+                  {latenteVpbActief && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
+                        <span>% van BV als ongerealiseerde koerswinst:</span>
+                        <input
+                          type="number" min={0} max={100} step={5}
+                          value={latenteVpbPct}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => setLatenteVpbPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                          style={{ width: 56, padding: '0.15rem 0.3rem', border: '1px solid var(--border)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: '0.65rem', background: 'var(--surface-2)', color: 'var(--text)' }}
+                        />
+                        <span>%</span>
+                      </div>
+                      <div>
+                        Getrapt tarief: ≤ €200K winst → 19%; meerdere → 25,8%
+                        {waterfall.latenteVpb > 0 && (
+                          <> · berekend: {fmt(Math.round(waterfall.latenteVpb))}</>
+                        )}
+                      </div>
+                      <div style={{ marginTop: '0.2rem', color: 'var(--amber)' }}>
+                        ⚠️ Conservatieve default. Pas aan op eigen kostprijsregistratie.
+                      </div>
+                    </>
+                  )}
+                  {!latenteVpbActief && (
+                    <div style={{ color: 'var(--text-4)' }}>
+                      Aanname uitgestaan — hero-getal is <b>excl. latente VPB</b>. Zet aan voor conservatieve schatting.
+                    </div>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key:    'box2',
+              teken:  '−',
+              label:  'Latente box 2',
+              bedrag: waterfall.latenteBox2,
+              kleur:  'var(--red)',
+              sub:    `getrapt 24,5% / 31% · lage schijf ${fmt(Math.round(waterfall.box2InLaag))}${waterfall.box2InHoog > 0 ? ` · hoge schijf ${fmt(Math.round(waterfall.box2InHoog))}` : ''}${params.fiscaalPartner ? ' · drempel ×2 (partner)' : ''}`,
+              detail: (
+                <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+                  <div>Grondslag: BV na latente VPB = {fmt(Math.round(waterfall.bvNaVpb))}</div>
+                  {waterfall.box2InHoog > 0 ? (
+                    <>
+                      <div>Lage schijf (≤ €{(params.box2Grens ?? BASE_PARAMS.box2Grens).toLocaleString('nl-NL')}{params.fiscaalPartner ? ' ×2' : ''}): {fmt(Math.round(waterfall.box2InLaag))} × 24,5% = {fmt(Math.round(waterfall.box2InLaag * 0.245))}</div>
+                      <div>Hoge schijf (restant): {fmt(Math.round(waterfall.box2InHoog))} × 31% = {fmt(Math.round(waterfall.box2InHoog * 0.31))}</div>
+                    </>
+                  ) : (
+                    <div>Volledig lage schijf: {fmt(Math.round(waterfall.box2InLaag))} × 24,5% = {fmt(Math.round(waterfall.latenteBox2))}</div>
+                  )}
+                  <div style={{ marginTop: '0.3rem', color: 'var(--text-4)' }}>Latente belasting — verschuldigd bij uitkering als dividend. Geen cashflow-effect zolang BV aangehouden wordt.</div>
+                </div>
+              ),
+            },
+            {
+              key:    'prive',
+              teken:  '+',
+              label:  'Privé netto',
+              bedrag: waterfall.priveNetto,
+              kleur:  waterfall.priveNetto >= 0 ? 'var(--green)' : 'var(--red)',
+              sub:    `vermogen ${fmt(waterfall.priveVermogen)} − VRH ${fmt(Math.round(waterfall.vrh))}${waterfall.eigenWoningNetto > 0 ? ` + woning ${fmt(Math.round(waterfall.eigenWoningNetto))}` : ''}`,
+              detail: (
+                <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+                  <div>Privévermogen (box 3): {fmt(waterfall.priveVermogen)}</div>
+                  <div>VRH (box 3-heffing, jaarlijks): − {fmt(Math.round(waterfall.vrh))} · forfaitair stelsel 2026</div>
+                  {waterfall.eigenWoningNetto > 0
+                    ? <div>Eigen woning (WOZ − hypotheek): + {fmt(Math.round(waterfall.eigenWoningNetto))}</div>
+                    : <div style={{ color: 'var(--text-4)' }}>Eigen woning: niet ingevoerd (instelbaar via Instellingen)</div>
+                  }
+                  <div style={{ marginTop: '0.3rem', fontWeight: 600, color: 'var(--text)' }}>
+                    Privé netto = {fmt(Math.round(waterfall.priveNetto))}
+                  </div>
+                </div>
+              ),
+            },
+          ].map(({ key, teken, label, bedrag, kleur, sub, subLabel, detail }) => (
+            <div key={key}>
+              <div
+                onClick={() => toggleWf(key)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 0', borderBottom: '1px solid var(--border-faint, rgba(0,0,0,0.06))', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: kleur ?? 'var(--text)', width: 10, flexShrink: 0 }}>{teken}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text)', fontWeight: 500 }}>{label}</div>
+                    {sub && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-3)', marginTop: '0.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
+                    {subLabel && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--amber)', marginTop: '0.05rem' }}>{subLabel}</div>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 600, color: kleur ?? 'var(--text)' }}>
+                    {teken && bedrag > 0 ? `${teken} ` : ''}{fmt(Math.round(bedrag))}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-4)' }}>{wfExpand.has(key) ? '▲' : '▼'}</span>
+                </div>
+              </div>
+              {wfExpand.has(key) && detail && detail}
+            </div>
+          ))}
+
+          {/* Totaallijn */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0 0.2rem', marginTop: '0.1rem', borderTop: '2px solid var(--accent)' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>= Netto besteedbaar vandaag</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)' }}>
+              {fmt(Math.round(waterfall.nettoBesteedbaar))}
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {/* Gerealiseerd rendement */}
       {histRendement && (
