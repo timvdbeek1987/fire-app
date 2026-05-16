@@ -2,12 +2,18 @@
  * FISCALE PARAMETERS — geversioneerde bron van waarheid
  *
  * Elke parameter draagt:
- *   waarde          — getal
- *   bron            — URL naar officiële publicatie
- *   geverifieerd    — bool: true = handmatig gecontroleerd; false = vereenvoudiging of te verifiëren
- *   belastingjaar   — int: het jaar waarvoor de waarde geldt
+ *   waarde             — getal
+ *   bron               — URL naar officiële publicatie
+ *   geverifieerd       — bool: true = handmatig gecontroleerd; false = vereenvoudiging of te verifiëren
+ *   status             — 'definitief' | 'voorlopig' | 'afgeleid' | 'vereenvoudigd'
+ *                         definitief   : geverifieerd uit officiële publicatie
+ *                         voorlopig    : provisorisch; te hercontroleren bij definitieve vaststelling
+ *                         afgeleid     : berekend uit andere geverifieerde params (niet direct gebron'd)
+ *                         vereenvoudigd: structurele modelkeuze; te vervangen door correcte implementatie
+ *   belastingjaar      — int: het jaar waarvoor de waarde geldt
  *   verversings_cadans — 'jaarlijks' | 'halfjaarlijks': hoe vaak de waarde hercontroleerd moet worden
- *   toelichting     — optioneel: modelkeuze of beperking
+ *   aannames           — optioneel: object met expliciete modelaannames (bv. { loonheffingskorting: true })
+ *   toelichting        — optioneel: modelkeuze of beperking
  *
  * Wijzig alleen na verificatie tegen de genoemde bron.
  * GEBRUIK: importeer `getFiscaleWaarden()` — nooit waarden direct hardcoden.
@@ -120,17 +126,25 @@ export const FISCALE_PARAMS_2026 = {
   vermogensrendementsheffing: {
     waarde: 0.02160,  // = box3ForfaitOverigeBezittingen (6,0%) × box3Tarief (36%)
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
-    geverifieerd: true,  // afgeleid van twee geverifieerde componenten; zie toelichting
+    geverifieerd: true,
+    status: 'afgeleid',  // berekend uit box3ForfaitOverigeBezittingen × box3Tarief; niet direct gebron'd
     belastingjaar: 2026,
     verversings_cadans: 'jaarlijks',
     toelichting: 'Vereenvoudiging, forfaitair — tegenbewijsregeling niet gemodelleerd. Effectief: forfait overige bezittingen (6,0% definitief) × IB-tarief (36%). Spaargeld-/schulden-forfaits apart opgeslagen als voorlopig.',
   },
 
   // ── Inkomstenbelasting / DGA ───────────────────────────────────────────────
+  // 🗺️ ROADMAP — TICKET: "Box 1 progressief tarief vervangt platte 43% — vóór Module 3-optimizers"
+  //    Scope : volledige schijvenberekening met actuele tariefgrenzen, heffingskortingen (algemeen,
+  //            arbeidskorting indien van toepassing) en aftrekposten.
+  //    Blocker: Module 3-DGA-optimizers (salaris/dividend-mix) mogen pas gebouwd worden nadat de
+  //             progressieve berekening klopt; plat tarief geeft verkeerde optimums.
+  //    Prioriteit: vóór eerste betalende gebruiker die DGA-optimizer gebruikt.
   inkomstenbelasting: {
     waarde: 0.43,
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/belasting_berekenen_over_uw_inkomen',
-    geverifieerd: false,  // ⚠️ structurele vereenvoudiging van progressieve schaal — te vervangen; niet instelbaar via deze nullijn
+    geverifieerd: false,
+    status: 'vereenvoudigd',  // structurele modelkeuze — plat tarief ignoreert progressieve schaal; zie roadmap-ticket hierboven
     belastingjaar: 2026,
     verversings_cadans: 'jaarlijks',
     toelichting: 'Structurele vereenvoudiging van progressieve schaal — te vervangen. Plat effectief tarief ignoreert aftrekposten, heffingskortingen en schijfsprongen. Instelling via Instellingen-scherm; accountant-verificatie noodzakelijk.',
@@ -147,19 +161,29 @@ export const FISCALE_PARAMS_2026 = {
   // AOW-bedragen worden halfjaarlijks geïndexeerd (januari en juli).
   // Cadans: 'halfjaarlijks' — banner slaat alarm bij > 6 maanden zonder hercontrole.
   aowBedragAlleenstaand: {
-    waarde: 18700,  // netto p/j, alleenstaand, met loonheffingskorting — januari 2026 (svb.nl)
+    waarde: 18700,  // netto p/j, alleenstaand — januari 2026 (svb.nl)
     bron: 'https://www.svb.nl/nl/aow/hoogte-aow',
     geverifieerd: true,
+    status: 'definitief',
     belastingjaar: 2026,
     verversings_cadans: 'halfjaarlijks',
+    aannames: {
+      loonheffingskorting: true,   // bedrag is ná toepassing loonheffingskorting; vervalt automatisch bij hogere andere inkomsten
+      peildatum: 'januari 2026',   // SVB indexeert elke januari en juli — hercontroleer bij volgende indexatie
+    },
     toelichting: 'Netto jaarbedrag inclusief loonheffingskorting, peildatum januari 2026. Hercontroleer bij elke SVB-indexatie (januari en juli).',
   },
   aowBedragPartner: {
-    waarde: 12800,  // netto p/j per persoon, met partner, met loonheffingskorting — januari 2026 (svb.nl)
+    waarde: 12800,  // netto p/j per persoon, met partner — januari 2026 (svb.nl)
     bron: 'https://www.svb.nl/nl/aow/hoogte-aow',
     geverifieerd: true,
+    status: 'definitief',
     belastingjaar: 2026,
     verversings_cadans: 'halfjaarlijks',
+    aannames: {
+      loonheffingskorting: true,   // bedrag is ná toepassing loonheffingskorting; vervalt automatisch bij hogere andere inkomsten
+      peildatum: 'januari 2026',   // SVB indexeert elke januari en juli — hercontroleer bij volgende indexatie
+    },
     toelichting: 'Netto jaarbedrag per persoon inclusief loonheffingskorting, peildatum januari 2026. Hercontroleer bij elke SVB-indexatie (januari en juli).',
   },
 };
