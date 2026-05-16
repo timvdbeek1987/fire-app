@@ -61,19 +61,49 @@ export const FISCALE_PARAMS_2026 = {
   },
 
   // ── Box 3 / VRH ───────────────────────────────────────────────────────────
-  // ⚠️ TE VERIFIËREN — forfaits wijzigen jaarlijks; onder voorbehoud rechtszaak HR
-  vermogensrendementsheffing: {
-    waarde: 0.02088,  // effectief tarief: 2.001% fictief rendement × 36% IB × correctiefactor
-    bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
-    geverifieerd: false,  // ⚠️ nog niet geverifieerd voor 2026 — forfaits nog niet definitief
+  // Model: vereenvoudiging, forfaitair — tegenbewijsregeling niet gemodelleerd.
+  // Component-parameters zijn de bron; `vermogensrendementsheffing` is afgeleid
+  // als box3ForfaitOverigeBezittingen × box3Tarief (beleg-dominant portfolio).
+  box3Tarief: {
+    waarde: 0.36,  // IB-tarief op fictief rendement box 3
+    bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/inkomstenbelasting/heffingskortingen_boxen_tarieven/boxen_en_tarieven/belasting_berekenen_over_uw_inkomen',
+    geverifieerd: true,
     belastingjaar: 2026,
-    toelichting: 'Effectief gecombineerd tarief (forfait × IB-tarief). Gebruik werkelijk rendement zodra wet in werking treedt.',
   },
   heffingsvrijVermogen: {
-    waarde: 57000,  // per persoon (2025 was €57.000, 2026 te verifiëren)
+    waarde: 59357,  // per persoon; ×2 bij fiscaal partner
     bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
-    geverifieerd: false,  // ⚠️ te verifiëren voor 2026
+    geverifieerd: true,
     belastingjaar: 2026,
+  },
+  box3ForfaitOverigeBezittingen: {
+    waarde: 0.060,  // fictief rendement beleggingen/overige bezittingen — definitief 2026
+    bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
+    geverifieerd: true,
+    belastingjaar: 2026,
+    toelichting: 'Definitief gepubliceerd forfait overige bezittingen 2026.',
+  },
+  box3ForfaitSpaargeld: {
+    waarde: 0.0128,  // fictief rendement spaargeld — VOORLOPIG 2026 (definitief pas na aanslagregeling)
+    bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
+    geverifieerd: false,  // ⚠️ voorlopig — definitieve waarde volgt na belastingaanslagen
+    belastingjaar: 2026,
+  },
+  box3ForfaitSchulden: {
+    waarde: 0.028,  // fictief rendement schulden (negatief) — VOORLOPIG 2026
+    bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
+    geverifieerd: false,  // ⚠️ voorlopig — definitieve waarde volgt na belastingaanslagen
+    belastingjaar: 2026,
+  },
+  // Afgeleid effectief tarief: box3ForfaitOverigeBezittingen × box3Tarief = 6,0% × 36% = 2,16%
+  // Gebruikt in engine als benadering voor een beleg-dominant privé-portfolio.
+  // Vereenvoudiging: tegenbewijsregeling, werkelijk rendement, en schulden-aftrek niet gemodelleerd.
+  vermogensrendementsheffing: {
+    waarde: 0.02160,  // = box3ForfaitOverigeBezittingen (6,0%) × box3Tarief (36%)
+    bron: 'https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/prive/vermogen_en_aanmerkelijk_belang/vermogen/belasting_betalen_over_uw_vermogen/heffingsvrij-vermogen',
+    geverifieerd: true,  // afgeleid van twee geverifieerde componenten; zie toelichting
+    belastingjaar: 2026,
+    toelichting: 'Vereenvoudiging, forfaitair — tegenbewijsregeling niet gemodelleerd. Effectief: forfait overige bezittingen (6,0% definitief) × IB-tarief (36%). Spaargeld-/schulden-forfaits apart opgeslagen als voorlopig.',
   },
 
   // ── Inkomstenbelasting / DGA ───────────────────────────────────────────────

@@ -166,18 +166,20 @@ describe('D. runMonteCarlo deterministisch (zelfde seed bij zelfde params)', () 
     expect(run.kansSucces).toBe(100);
   });
 
-  it('bvP50 op leeftijd 60 = 430892 (snapshot)', () => {
+  it('bvP50 op leeftijd 60 = 430281 (snapshot)', () => {
     const run = runMonteCarlo(PARAMS_D, START_D, 2500);
     const r60 = run.years.find(r => r.leeftijd === 60);
     // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 471801 → 430892
-    expect(r60?.bvP50).toBe(430892);
+    // UPDATE box3 params: VRH 2.088% → 2.160% (6,0% forfait × 36% tarief, beide definitief 2026). Delta: 430892 → 430281 (−611)
+    expect(r60?.bvP50).toBe(430281);
   });
 
-  it('totaalP50 op leeftijd 60 = 538807 (snapshot)', () => {
+  it('totaalP50 op leeftijd 60 = 537695 (snapshot)', () => {
     const run = runMonteCarlo(PARAMS_D, START_D, 2500);
     const r60 = run.years.find(r => r.leeftijd === 60);
     // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 579497 → 538807
-    expect(r60?.totaalP50).toBe(538807);
+    // UPDATE box3 params: VRH 2.088% → 2.160% (6,0% forfait × 36% tarief, beide definitief 2026). Delta: 538807 → 537695 (−1112)
+    expect(r60?.totaalP50).toBe(537695);
   });
 
 });
@@ -210,14 +212,16 @@ describe('E. berekenVereistKapitaalAnalytisch', () => {
 
 describe('F. berekenMaandelijksOnttrektbaar', () => {
 
-  it('Portfolio 1M, 10 jaar tot pensioen: maandelijks onttrektbaar = 2274', () => {
+  it('Portfolio 1M, 10 jaar tot pensioen: maandelijks onttrektbaar = 2248', () => {
+    // UPDATE box3 params: VRH 2.088% → 2.160%. Delta: 2274 → 2248 (−26)
     const mnd = berekenMaandelijksOnttrektbaar(BASE_PARAMS, 1_000_000, 10);
-    expect(mnd).toBe(2274);
+    expect(mnd).toBe(2248);
   });
 
-  it('Portfolio 500K, 5 jaar tot pensioen: maandelijks onttrektbaar = 1255', () => {
+  it('Portfolio 500K, 5 jaar tot pensioen: maandelijks onttrektbaar = 1241', () => {
+    // UPDATE box3 params: VRH 2.088% → 2.160%. Delta: 1255 → 1241 (−14)
     const mnd = berekenMaandelijksOnttrektbaar(BASE_PARAMS, 500_000, 5);
-    expect(mnd).toBe(1255);
+    expect(mnd).toBe(1241);
   });
 
   it('Grotere portfolio geeft hogere maandelijkse onttrekking', () => {
