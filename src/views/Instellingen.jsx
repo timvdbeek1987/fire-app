@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { BASE_PARAMS, fmtFull, fmtPct } from '../data.js';
+import { ACTIEVE_FISCALE_PARAMS, checkStaleness } from '../fiscalParams.js';
 
 const F = ({ label, help, value, onChange, step=1, min, max, suffix, prefix }) => (
   <div className="form-group">
@@ -40,9 +41,15 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
   const pensioenJaar = geboortejaar + (local.pensioenLeeftijd ?? 55);
   const currentYear  = new Date().getFullYear();
   const jaarHypo     = local.jaarHypotheekvrij ?? BASE_PARAMS.jaarHypotheekvrij;
+  const staleness    = checkStaleness();
 
   return (
     <div className="fade-up">
+      {staleness.verouderd && (
+        <div style={{ padding: '0.75rem 1rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--r)', marginBottom: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: '#dc2626' }}>
+          ⚠️ {staleness.reden}
+        </div>
+      )}
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Configuratie</div>
@@ -125,56 +132,60 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
           <F label="Pensioen / lijfrente netto/jaar"
             value={local.jaarlijksNettoSPMS ?? (isPrive ? 0 : BASE_PARAMS.jaarlijksNettoSPMS)} onChange={set('jaarlijksNettoSPMS')} prefix="€" step={250}
             help={`Netto pensioeninkomen (werkgever, lijfrente, etc.) vanaf leeftijd ${local.spmsLeeftijd??60} jaar. Verlaagt de onttrekkingsbehoefte.`}/>
-          <F label="AOW netto/jaar" value={local.jaarlijksNettoAOW ?? BASE_PARAMS.jaarlijksNettoAOW} onChange={set('jaarlijksNettoAOW')} prefix="€" step={250}
-            help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto)`}/>
+          <F label="AOW netto/jaar ⚠️ te verifiëren" value={local.jaarlijksNettoAOW ?? BASE_PARAMS.jaarlijksNettoAOW} onChange={set('jaarlijksNettoAOW')} prefix="€" step={250}
+            help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto) — bedragen worden halfjaarlijks geïndexeerd; verifieer via svb.nl`}/>
         </div>
 
         {!isPrive && <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>🧾 Belastingen & DGA</div>
           <F label="Vennootschapsbelasting (VPB)" value={+(local.vennootschapsbelasting*100).toFixed(1)}
             onChange={v=>set('vennootschapsbelasting')(v/100)} step={0.5} suffix="%"
-            help="19% over eerste €200K winst (2024)"/>
+            help="19% over eerste €200K winst (belastingjaar 2026, geverifieerd)"/>
           <F label="Dividendbelasting (Box 2)" value={+(local.dividendbelasting*100).toFixed(1)}
             onChange={v=>set('dividendbelasting')(v/100)} step={0.5} suffix="%"
-            help="24,5% (2024)"/>
-          <F label="Inkomstenbelasting DGA-salaris" value={+(local.inkomstenbelasting*100).toFixed(1)}
-            onChange={v=>set('inkomstenbelasting')(v/100)} step={0.5} suffix="%"/>
-          <F label="Verplicht DGA-salaris" value={local.verplichtDGAsalaris ?? BASE_PARAMS.verplichtDGAsalaris} onChange={set('verplichtDGAsalaris')} prefix="€" step={1000}
-            help="Gebruikelijk loon minimum"/>
-          <F label="Vermogensrendementsheffing (Privé)" value={+(local.vermogensrendementsheffing*100).toFixed(3)}
+            help="24,5% (belastingjaar 2026, geverifieerd)"/>
+          <F label="Inkomstenbelasting DGA-salaris ⚠️ te verifiëren" value={+(local.inkomstenbelasting*100).toFixed(1)}
+            onChange={v=>set('inkomstenbelasting')(v/100)} step={0.5} suffix="%"
+            help="Effectief marginaal tarief box 1 — sterk afhankelijk van aftrekposten en kortingen. Verifieer met je accountant."/>
+          <F label="Verplicht DGA-salaris ⚠️ te verifiëren" value={local.verplichtDGAsalaris ?? BASE_PARAMS.verplichtDGAsalaris} onChange={set('verplichtDGAsalaris')} prefix="€" step={1000}
+            help="Gebruikelijk loon norm 2025 (2026 te verifiëren bij Belastingdienst)"/>
+          <F label="Vermogensrendementsheffing (Privé) ⚠️ te verifiëren" value={+(local.vermogensrendementsheffing*100).toFixed(3)}
             onChange={v=>set('vermogensrendementsheffing')(v/100)} step={0.01} suffix="%"
-            help="Box 3 effectief tarief (2024: ~2.09%)"/>
+            help="Box 3 effectief tarief — forfaits wijzigen jaarlijks; onder voorbehoud rechtszaak HR (2026 nog niet definitief)"/>
         </div>}
 
         {!isPrive && <div className="card">
           <div style={{ padding:'0.6rem 0.8rem', background:'rgba(245,158,11,0.08)', borderRadius:'var(--r)', border:'1px solid rgba(245,158,11,0.25)', marginBottom:'1rem', fontSize:'0.75rem', color:'var(--ink-muted)', fontFamily:'var(--font-mono)', lineHeight:1.6 }}>
             ⚠️ Fiscale tarieven — peildatum 2026. Controleer met je accountant; tarieven wijzigen jaarlijks.
           </div>
-          <div className="card-title" style={{ marginBottom:'1rem' }}>🏛️ VPB-tarieven</div>
+          <div className="card-title" style={{ marginBottom:'0.4rem' }}>🏛️ VPB-tarieven</div>
+          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.64rem', color:'var(--ink-muted)', marginBottom:'1rem' }}>
+            Fiscale regels belastingjaar {ACTIEVE_FISCALE_PARAMS.belastingjaar} · Laatst gecontroleerd: {ACTIEVE_FISCALE_PARAMS.geverifieerd_op}
+          </div>
           <F label="VPB laag tarief (t/m schijfgrens)"
-            value={+((local.vpbTariefLaag ?? BASE_PARAMS.vpbTariefLaag ?? 0.19)*100).toFixed(1)}
+            value={+((local.vpbTariefLaag ?? BASE_PARAMS.vpbTariefLaag)*100).toFixed(1)}
             onChange={v=>set('vpbTariefLaag')(v/100)} step={0.5} suffix="%"
-            help="Wet Vpb — 19% over winst t/m schijfgrens (2024)"/>
+            help="Wet Vpb — 19% over winst t/m schijfgrens (belastingjaar 2026, geverifieerd)"/>
           <F label="VPB schijfgrens"
-            value={local.vpbGrens ?? BASE_PARAMS.vpbGrens ?? 200000}
+            value={local.vpbGrens ?? BASE_PARAMS.vpbGrens}
             onChange={set('vpbGrens')} prefix="€" step={10000}
-            help="Grens laag/hoog VPB-tarief — €200.000 (2024)"/>
+            help="Grens laag/hoog VPB-tarief — €200.000 (belastingjaar 2026, geverifieerd)"/>
           <F label="VPB hoog tarief (boven schijfgrens)"
-            value={+((local.vpbTariefHoog ?? BASE_PARAMS.vpbTariefHoog ?? 0.258)*100).toFixed(1)}
+            value={+((local.vpbTariefHoog ?? BASE_PARAMS.vpbTariefHoog)*100).toFixed(1)}
             onChange={v=>set('vpbTariefHoog')(v/100)} step={0.5} suffix="%"
-            help="Wet Vpb — 25,8% over winst boven schijfgrens (2024)"/>
-          <F label="Box 2 tarief laag (t/m €67K p.p.)"
-            value={+((local.box2TariefLaag ?? BASE_PARAMS.box2TariefLaag ?? 0.245)*100).toFixed(1)}
+            help="Wet Vpb — 25,8% over winst boven schijfgrens (belastingjaar 2026, geverifieerd)"/>
+          <F label="Box 2 tarief laag (t/m schijfgrens p.p.)"
+            value={+((local.box2TariefLaag ?? BASE_PARAMS.box2TariefLaag)*100).toFixed(1)}
             onChange={v=>set('box2TariefLaag')(v/100)} step={0.5} suffix="%"
-            help="Wet IB 2001 art. 2.12 — 24,5% t/m €67K per persoon (2024)"/>
+            help="Wet IB 2001 art. 2.12 — 24,5% t/m schijfgrens per persoon (belastingjaar 2026, geverifieerd)"/>
           <F label="Box 2 schijfgrens per persoon"
-            value={local.box2Grens ?? BASE_PARAMS.box2Grens ?? 67000}
+            value={local.box2Grens ?? BASE_PARAMS.box2Grens}
             onChange={set('box2Grens')} prefix="€" step={1000}
-            help="Fiscaal partner: schijfgrens is €67K per persoon (2024)"/>
+            help="€68.843 per persoon fiscaal partner (belastingjaar 2026, geverifieerd)"/>
           <F label="Box 2 tarief hoog"
-            value={+((local.box2TariefHoog ?? BASE_PARAMS.box2TariefHoog ?? 0.331)*100).toFixed(1)}
+            value={+((local.box2TariefHoog ?? BASE_PARAMS.box2TariefHoog)*100).toFixed(1)}
             onChange={v=>set('box2TariefHoog')(v/100)} step={0.5} suffix="%"
-            help="33% over box 2-inkomen boven €67K per persoon (2024)"/>
+            help="31% over box 2-inkomen boven schijfgrens per persoon (belastingjaar 2026, geverifieerd) — actief per fase 1b"/>
         </div>}
 
         <div className="card">

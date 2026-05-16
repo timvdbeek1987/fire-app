@@ -4,6 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { CheckCircle, Clock } from 'lucide-react';
 import { BASE_PARAMS, fmt, fmtFull, berekenVereistKapitaalAnalytisch } from '../data.js';
 import { InfoTip } from '../Tooltip.jsx';
+import { checkStaleness } from '../fiscalParams.js';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -166,6 +167,7 @@ export default function Dashboard({
   const fillPct   = pkComfort  > 0 ? Math.min(100, progressRef / refMax * 100) : 0;
 
   const kansSucces = mcResult?.kansSucces ?? 0;
+  const stalenessCheck = checkStaleness();
 
   // Inkomen tiers
   const inkomenTiers = [
@@ -176,6 +178,11 @@ export default function Dashboard({
 
   return (
     <div>
+      {stalenessCheck.verouderd && (
+        <div style={{ padding: '0.5rem 0.8rem', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--r)', marginBottom: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#dc2626' }}>
+          ⚠️ {stalenessCheck.reden}
+        </div>
+      )}
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Dashboard</div>
