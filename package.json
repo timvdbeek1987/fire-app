@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "scripts": {
     "build": "npx vite build",
-    "dev": "npx vite"
+    "dev": "npx vite",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -14,6 +16,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.0.0",
-    "vite": "^4.4.0"
+    "vite": "^4.4.0",
+    "vitest": "^4.1.6"
   }
 }

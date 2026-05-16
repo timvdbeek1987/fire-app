@@ -73,10 +73,23 @@ export const BASE_PARAMS = {
   jaarlijksNettoSPMS:         33750,
   jaarlijksNettoAOW:          16680,
   verplichtDGAsalaris:        20000,
-  dividendbelasting:          0.245,
+  // === Fiscale parameters (peildatum 2026 — bevestig met accountant) ===
+  // VPB
+  vpbTariefLaag:              0.19,    // 19% — Wet Vpb 2024, schijf t/m €200K
+  vpbGrens:                   200000,  // € — schijfgrens laag/hoog tarief
+  vpbTariefHoog:              0.258,   // 25.8% — Wet Vpb 2024, schijf boven €200K
+  // Box 2
+  box2TariefLaag:             0.245,   // 24.5% — Wet IB 2001 art. 2.12, t/m €67K per persoon
+  box2Grens:                  67000,   // € per persoon (fiscaal partner: ×2)
+  box2TariefHoog:             0.331,   // 33% — boven €67K per persoon
+  // Box 3 / VRH (huidig forfaitair stelsel — onder voorbehoud rechtszaak)
+  vermogensrendementsheffing: 0.02088, // effectief tarief 2025 (2.001% fictief rendement × 36% × correctiefactor)
+  // Inkomstenbelasting (globale effectieve tarieven — pas aan op eigen situatie)
+  inkomstenbelasting:         0.43,    // effectief marginaal tarief DGA-salaris
+  // Dividendbelasting (= box 2 laag tarief — alias voor achterwaartse compatibiliteit)
+  dividendbelasting:          0.245,   // 24.5% — zelfde als box2TariefLaag
+  // Vennootschapsbelasting (achterwaartse compatibiliteit — alias voor vpbTariefLaag)
   vennootschapsbelasting:     0.19,
-  inkomstenbelasting:         0.43,
-  vermogensrendementsheffing: 0.02088,
   jaarHypotheekvrij:          2050,
   maandelijkseHypotheeklast:  2000,
   hypotheekRestschuld:        150000,
@@ -324,10 +337,11 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendBelegBVb = bvBeleg * jaarR;
       const rendBVb      = rendBelegBVb + rendSpaarBVb;
       const winstNaSalaris = Math.max(0, rendBVb - brutoDGAjaar);
+      const vpbGrens = p.vpbGrens ?? 200000;
       const vpb = winstNaSalaris > 0
-        ? (winstNaSalaris <= 200000
-            ? winstNaSalaris * 0.19
-            : 200000 * 0.19 + (winstNaSalaris - 200000) * 0.258)
+        ? (winstNaSalaris <= vpbGrens
+            ? winstNaSalaris * (p.vpbTariefLaag ?? 0.19)
+            : vpbGrens * (p.vpbTariefLaag ?? 0.19) + (winstNaSalaris - vpbGrens) * (p.vpbTariefHoog ?? 0.258))
         : 0;
       const rendBVn = rendBVb - vpb;
 

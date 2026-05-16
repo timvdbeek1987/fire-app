@@ -146,6 +146,37 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
             help="Box 3 effectief tarief (2024: ~2.09%)"/>
         </div>}
 
+        {!isPrive && <div className="card">
+          <div style={{ padding:'0.6rem 0.8rem', background:'rgba(245,158,11,0.08)', borderRadius:'var(--r)', border:'1px solid rgba(245,158,11,0.25)', marginBottom:'1rem', fontSize:'0.75rem', color:'var(--ink-muted)', fontFamily:'var(--font-mono)', lineHeight:1.6 }}>
+            ⚠️ Fiscale tarieven — peildatum 2026. Controleer met je accountant; tarieven wijzigen jaarlijks.
+          </div>
+          <div className="card-title" style={{ marginBottom:'1rem' }}>🏛️ VPB-tarieven</div>
+          <F label="VPB laag tarief (t/m schijfgrens)"
+            value={+((local.vpbTariefLaag ?? BASE_PARAMS.vpbTariefLaag ?? 0.19)*100).toFixed(1)}
+            onChange={v=>set('vpbTariefLaag')(v/100)} step={0.5} suffix="%"
+            help="Wet Vpb — 19% over winst t/m schijfgrens (2024)"/>
+          <F label="VPB schijfgrens"
+            value={local.vpbGrens ?? BASE_PARAMS.vpbGrens ?? 200000}
+            onChange={set('vpbGrens')} prefix="€" step={10000}
+            help="Grens laag/hoog VPB-tarief — €200.000 (2024)"/>
+          <F label="VPB hoog tarief (boven schijfgrens)"
+            value={+((local.vpbTariefHoog ?? BASE_PARAMS.vpbTariefHoog ?? 0.258)*100).toFixed(1)}
+            onChange={v=>set('vpbTariefHoog')(v/100)} step={0.5} suffix="%"
+            help="Wet Vpb — 25,8% over winst boven schijfgrens (2024)"/>
+          <F label="Box 2 tarief laag (t/m €67K p.p.)"
+            value={+((local.box2TariefLaag ?? BASE_PARAMS.box2TariefLaag ?? 0.245)*100).toFixed(1)}
+            onChange={v=>set('box2TariefLaag')(v/100)} step={0.5} suffix="%"
+            help="Wet IB 2001 art. 2.12 — 24,5% t/m €67K per persoon (2024)"/>
+          <F label="Box 2 schijfgrens per persoon"
+            value={local.box2Grens ?? BASE_PARAMS.box2Grens ?? 67000}
+            onChange={set('box2Grens')} prefix="€" step={1000}
+            help="Fiscaal partner: schijfgrens is €67K per persoon (2024)"/>
+          <F label="Box 2 tarief hoog"
+            value={+((local.box2TariefHoog ?? BASE_PARAMS.box2TariefHoog ?? 0.331)*100).toFixed(1)}
+            onChange={v=>set('box2TariefHoog')(v/100)} step={0.5} suffix="%"
+            help="33% over box 2-inkomen boven €67K per persoon (2024)"/>
+        </div>}
+
         <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>🏠 Hypotheek</div>
           <div className="form-group">
