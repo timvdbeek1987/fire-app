@@ -777,3 +777,164 @@ describe('J. box3VrhJaar — 2028-schakelaar werkelijk-rendementstelsel', () => 
     expect(Math.round(box3VrhJaar(60000, 140000, 2028, p))).toBe(5063);
   });
 });
+
+// ─── L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking ─────────────
+//
+// Bewijst dat fiscaalPartner: true (Wet IB art. 5a) aantoonbaar doorwerkt tot in
+// berekenNettoBesteedbaar via twee afzonderlijke paden:
+//   1. box 2-drempel: grens = box2Grens × 2 → minder in hoge schijf → lagere latenteBox2
+//   2. VRH: hvv = heffingsvrijVermogen × 2 → grotere grondslag vrijgesteld → lagere vrh
+//
+// Tevens bevestigd dat dit NIET afhangt van partnerActief (die flag beïnvloedt de MC-
+// projectie, niet de §5.2-waterfall). Het pad Instellingen-toggle → params.fiscaalPartner
+// → berekenNettoBesteedbaar → hero-getal is hiermee volledig gedekt.
+//
+// Nullijn (belastingjaar 2026, fiscalParams.js):
+//   vpbTariefLaag:                19%    (r.28)
+//   vpbGrens:                     200.000 (r.35)
+//   vpbTariefHoog:                25,8%  (r.42)
+//   box2TariefLaag:               24,5%  (r.51)
+//   box2Grens:                    68.843 (r.58)   ← enkelvoud; ×2 bij fiscaalPartner
+//   box2TariefHoog:               31%    (r.65)
+//   heffingsvrijVermogen:         59.357 (r.94)   ← enkelvoud; ×2 bij fiscaalPartner
+//   box3Tarief:                   36%    (r.87)
+//   box3ForfaitSpaargeld:         1,28%  (r.109, ⚠️ voorlopig)
+//   box3ForfaitOverigeBezittingen: 6,0%  (r.101)
+//
+// Profiel: DGA-FullStack-2026 (identiek aan describe K)
+//   bvBruto = 1.500.000, ongerealiseerdeWinstBV = 500.000
+//   priveSpaar = 120.000, priveBeleg = 480.000
+//   wozWaarde = 750.000, hypotheekRestschuld = 250.000
+
+const L_P = {
+  ...BASE_PARAMS,
+  vpbTariefLaag:                 0.19,
+  vpbGrens:                      200000,
+  vpbTariefHoog:                 0.258,
+  box2TariefLaag:                0.245,
+  box2Grens:                     68843,
+  box2TariefHoog:                0.31,
+  box3Tarief:                    0.36,
+  heffingsvrijVermogen:          59357,
+  box3ForfaitSpaargeld:          0.0128,
+  box3ForfaitOverigeBezittingen: 0.06,
+  // fiscaalPartner wordt per test overschreven
+};
+
+describe('L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking (2026-params)', () => {
+
+  it('(a) fiscaalPartner=false — enkelvoudige drempel, basishandberekening', () => {
+    // Nullijn (zie describe L):
+    //   box2Grens = 68.843 (r.58), hvv = 59.357 (r.94)
+    //
+    // Stap 1 VPB: 200.000 × 19% + 300.000 × 25,8% = 38.000 + 77.400 = 115.400
+    // Stap 2 bvNaVpb: 1.500.000 − 115.400 = 1.384.600
+    // Stap 3 box2 (grens = 68.843):
+    //   box2InLaag = 68.843 × 24,5% = 16.867
+    //   box2InHoog = 1.315.757 × 31%  = 407.885
+    //   latenteBox2 = 424.751 (niet gerond tussenstap)
+    // Stap 4 VRH (hvv = 59.357):
+    //   totaal = 600.000; grondslag = 540.643; gvh = 540.643/600.000
+    //   fictiefRendement = 120.000 × 1,28% + 480.000 × 6,0% = 1.536 + 28.800 = 30.336
+    //   VRH = 30.336 × (540.643/600.000) × 36% = 9.841 (niet gerond tussenstap)
+    // Stap 5 nettoBesteedbaar:
+    //   bvNetto  = 1.384.600 − 424.751 = 959.849
+    //   priveNetto = 600.000 − 9.841  = 590.159
+    //   nettoBesteedbaar = 959.849 + 590.159 = 1.550.008
+    const p = { ...L_P, fiscaalPartner: false };
+    const r = berekenNettoBesteedbaar({
+      bvBruto: 1500000, ongerealiseerdeWinstBV: 500000,
+      priveSpaar: 120000, priveBeleg: 480000,
+      wozWaarde: 750000, hypotheekRestschuld: 250000,
+      p,
+    });
+    expect(Math.round(r.nettoBesteedbaar)).toBe(1550008);
+    // Intermediaire waarden bevestigen pad via beide functies:
+    expect(Math.round(r.latenteBox2)).toBe(424751);  // box2-pad bewezen
+    expect(Math.round(r.vrh)).toBe(9841);             // VRH-pad bewezen
+  });
+
+  it('(b) fiscaalPartner=true — verdubbelde drempel; zelfde profiel als K(a)', () => {
+    // Nullijn (zie describe L):
+    //   box2Grens = 2 × 68.843 = 137.686, hvv = 2 × 59.357 = 118.714
+    //
+    // Stap 3 box2 (grens = 137.686):
+    //   box2InLaag = 137.686 × 24,5% = 33.733
+    //   box2InHoog = 1.246.914 × 31%  = 386.543
+    //   latenteBox2 = 420.276 (niet gerond tussenstap)
+    // Stap 4 VRH (hvv = 118.714):
+    //   grondslag = 481.286; gvh = 481.286/600.000
+    //   VRH = 30.336 × (481.286/600.000) × 36% = 8.760 (niet gerond tussenstap)
+    // Stap 5:
+    //   bvNetto  = 1.384.600 − 420.276 = 964.324
+    //   priveNetto = 600.000 − 8.760  = 591.240
+    //   nettoBesteedbaar = 964.324 + 591.240 = 1.555.563
+    //   (= K.a: zelfde profiel + fiscaalPartner=true → identiek verwacht resultaat)
+    const p = { ...L_P, fiscaalPartner: true };
+    const r = berekenNettoBesteedbaar({
+      bvBruto: 1500000, ongerealiseerdeWinstBV: 500000,
+      priveSpaar: 120000, priveBeleg: 480000,
+      wozWaarde: 750000, hypotheekRestschuld: 250000,
+      p,
+    });
+    expect(Math.round(r.nettoBesteedbaar)).toBe(1555563);
+    expect(Math.round(r.latenteBox2)).toBe(420276);
+    expect(Math.round(r.vrh)).toBe(8760);
+  });
+
+  it('(c) ontmaskerend: toggle maakt aantoonbaar verschil — niet nul', () => {
+    // Volledige berekening met onafgeronde tussenwaarden (JavaScript float64):
+    //
+    // STAP 1 — onafgeronde componentwaarden (uitvoer Node.js, exact):
+    //   box2_nop = 68843 × 0,245 + 1315757 × 0,31  = 424751,20499999996
+    //   box2_met = 137686 × 0,245 + 1246914 × 0,31 = 420276,41000000003
+    //   vrh_nop  = 30336 × (540643/600000) × 0,36  =   9840,5676288
+    //   vrh_met  = 30336 × (481286/600000) × 0,36  =   8760,1752576
+    //
+    // STAP 2 — onafgeronde delta's en hun afronding:
+    //   box2Δ = 424751,205 − 420276,410 = 4474,795  → Math.round = 4475
+    //   vrhΔ  =   9840,568 −  8760,175  = 1080,392  → Math.round = 1080
+    //   som Δ = 4474,795 + 1080,392     = 5555,188  → Math.round = 5555 ✓
+    //
+    // STAP 3 — onafgeronde totalen en afronding:
+    //   netto_nop = (1384600 − 424751,205) + (600000 − 9840,568) = 1550008,227
+    //   netto_met = (1384600 − 420276,410) + (600000 − 8760,175) = 1555563,415
+    //   Math.round(netto_met) − Math.round(netto_nop) = 1555563 − 1550008 = 5555 ✓
+    //
+    // CONCLUSIE (a) — functie correct; oorspronkelijke assertie gebruikte foutieve methode:
+    //
+    //   FOUT:   Math.round(vrh_nop) − Math.round(vrh_met) = 9841 − 8760 = 1081
+    //   JUIST:  Math.round(vrh_nop − vrh_met)             = Math.round(1080,392) = 1080
+    //
+    //   Oorzaak: vrh_nop (fractie 0,568 > 0,5) rondt ÓP → +0,432 inflatie in verschil
+    //            vrh_met (fractie 0,175 < 0,5) rondt AF → +0,175 inflatie in verschil
+    //            gecombineerd: +0,432 + 0,175 = +0,607 → duwt 1080,392 + 0,607 = 1081
+    //            exact voorbij de 0,5-grens → "verschil van afgeronde waarden" geeft 1081,
+    //            "afgerond verschil" geeft 1080; de test gebruikte de eerste (fout) methode.
+    //
+    // Correcte assertiemethode: Math.round(onafgerond Δ) per component, dan optellen.
+    // 4475 + 1080 = 5555 = totaalverschil — algebraïsch sluitend.
+    // Een echte toggle-regressie (fiscaalPartner niet doorgewerkt) maakt verschil = 0.
+
+    const pNop  = { ...L_P, fiscaalPartner: false };
+    const pMet  = { ...L_P, fiscaalPartner: true };
+    const invoer = {
+      bvBruto: 1500000, ongerealiseerdeWinstBV: 500000,
+      priveSpaar: 120000, priveBeleg: 480000,
+      wozWaarde: 750000, hypotheekRestschuld: 250000,
+    };
+    const rNop = berekenNettoBesteedbaar({ ...invoer, p: pNop });
+    const rMet = berekenNettoBesteedbaar({ ...invoer, p: pMet });
+
+    const verschil = Math.round(rMet.nettoBesteedbaar) - Math.round(rNop.nettoBesteedbaar);
+    expect(verschil).toBe(5555);         // totale toggle-impact
+    expect(verschil).toBeGreaterThan(0); // richting: partner → hogere vrijstelling → hoger hero-getal
+
+    // Component-splitsing: Math.round(Δ) — NIET Math.round(a) − Math.round(b)
+    const box2Δ = Math.round(rNop.latenteBox2 - rMet.latenteBox2); // Math.round(4474,795) = 4475
+    const vrhΔ  = Math.round(rNop.vrh         - rMet.vrh);         // Math.round(1080,392) = 1080
+    expect(box2Δ).toBe(4475);
+    expect(vrhΔ).toBe(1080);
+    expect(box2Δ + vrhΔ).toBe(verschil); // 4475 + 1080 = 5555 — algebraïsch sluitend
+  });
+});
