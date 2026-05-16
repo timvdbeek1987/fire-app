@@ -113,6 +113,8 @@ export const BASE_PARAMS = {
   spaarrenteBV:               0.025,
   spaarrentePrive:            0.025,
   uitputtingsLeeftijd:        90,
+  // 2028-schakelaar werkelijk rendementstelsel — 0 = uit (forfait ongewijzigd doorgetrokken)
+  box3WerkelijkRendement2028: 0,
 };
 
 // ============================================================
@@ -407,6 +409,49 @@ export function box3Heffing(spaargeld, beleggingen, p) {
   return fictiefRendement * grondslagVerhouding * vereist(p, 'box3Tarief');
 }
 
+/**
+ * Berekent de jaarlijkse VRH voor een specifiek kalenderjaar, met schakelbare overstap naar
+ * werkelijk-rendementstelsel per 2028 (p.box3WerkelijkRendement2028 > 0).
+ *
+ * Wanneer p.box3WerkelijkRendement2028 > 0 én jaar >= 2028:
+ *   fictiefRendement vervangen door werkelijkPct × totaalVermogen;
+ *   grondslag-/vrijstellings-/tariefsystematiek identiek aan box3Heffing:
+ *     werkelijkRendement   = totaal × werkelijkPct
+ *     grondslagVerhouding  = max(0, totaal − hvv) / totaal
+ *     heffing              = werkelijkRendement × grondslagVerhouding × tarief
+ *                          = werkelijkPct × max(0, totaal − hvv) × tarief   [vereenvoudigd]
+ *
+ * Wanneer schakelaar uit (box3WerkelijkRendement2028 = 0) óf jaar < 2028:
+ *   Delegeert ongewijzigd naar box3Heffing(spaargeld, beleggingen, p) — forfaitair stelsel.
+ *
+ * @param {number} spaargeld
+ * @param {number} beleggingen
+ * @param {number} jaar          — kalenderjaar van de simulatiestap (integer)
+ * @param {object} p             — params-object; veld box3WerkelijkRendement2028 optioneel (0 = uit)
+ * @returns {number}             — jaarlijkse heffing in euro's
+ */
+export function box3VrhJaar(spaargeld, beleggingen, jaar, p) {
+  const werkelijkPct = p.box3WerkelijkRendement2028 ?? 0;
+
+  if (werkelijkPct > 0 && jaar >= 2028) {
+    // Werkelijk-rendementstelsel: grondslag/vrijstelling/tarief identiek aan box3Heffing;
+    // uitsluitend het forfaitaire rendement wordt vervangen door werkelijk rendement.
+    const totaal = spaargeld + beleggingen;
+    if (totaal <= 0) return 0;
+    const hvv      = vereist(p, 'heffingsvrijVermogen') * (p.fiscaalPartner ? 2 : 1);
+    const grondslag = Math.max(0, totaal - hvv);
+    if (grondslag === 0) return 0;
+    // Stap 1: werkelijk rendement op het volledige vermogen
+    const werkelijkRendement = totaal * werkelijkPct;
+    // Stap 2: grondslagverhouding (identiek aan box3Heffing)
+    const grondslagVerhouding = grondslag / totaal;
+    // Stap 3: heffing
+    return werkelijkRendement * grondslagVerhouding * vereist(p, 'box3Tarief');
+  }
+
+  return box3Heffing(spaargeld, beleggingen, p);
+}
+
 function runSinglePath(p, start, so, randNorm, strategie = null) {
   const birthYear = p.geboortejaar ?? BIRTH_YEAR;
 
@@ -498,8 +543,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendSpaarBVn = rendSpaarBVb - vpbSpaar;
 
       const rendBelegPvb = (priveBeleg + inPv * 0.5) * jaarR;
-      // box3Heffing: correct forfait met heffingsvrijvermogen — vervangt prive × vermogensrendementsheffing × frac
-      const vrh          = box3Heffing(priveSpaar, priveBeleg, p) * frac;
+      // box3VrhJaar: correct forfait met heffingsvrijvermogen; schakelt naar werkelijk rendement vanaf 2028
+      const vrh          = box3VrhJaar(priveSpaar, priveBeleg, jaar, p) * frac;
       const rendBelegPvn = rendBelegPvb - vrh;
 
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
@@ -554,8 +599,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendBVn = rendBVb - vpb;
 
       const rendPvb = prive * jaarR;
-      // box3Heffing: correct forfait met heffingsvrijvermogen — vervangt prive × vermogensrendementsheffing × frac
-      const vrh     = box3Heffing(priveSpaar, priveBeleg, p) * frac;
+      // box3VrhJaar: correct forfait met heffingsvrijvermogen; schakelt naar werkelijk rendement vanaf 2028
+      const vrh     = box3VrhJaar(priveSpaar, priveBeleg, jaar, p) * frac;
       const rendPvn = rendPvb - vrh;
 
       const aflosJaar    = p.hypotheekAflosJaar    ?? 2040;
@@ -670,8 +715,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
       const rendSpaarPvn = priveSpaar * spaarRentePv * frac;
       const rendBelegPvb = priveBeleg * jaarR;
-      // box3Heffing: correct forfait met heffingsvrijvermogen — vervangt prive × vermogensrendementsheffing × frac
-      const vrhPv        = box3Heffing(priveSpaar, priveBeleg, p) * frac;
+      // box3VrhJaar: correct forfait met heffingsvrijvermogen; schakelt naar werkelijk rendement vanaf 2028
+      const vrhPv        = box3VrhJaar(priveSpaar, priveBeleg, jaar, p) * frac;
       const rendBelegPvn = rendBelegPvb - vrhPv;
       priveBeleg = Math.max(0, priveBeleg + rendBelegPvn - ontPv * (priveBeleg / Math.max(1, prive)));
       priveSpaar = Math.max(0, priveSpaar + rendSpaarPvn - ontPv * (priveSpaar / Math.max(1, prive)));

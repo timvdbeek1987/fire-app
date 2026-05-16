@@ -15,6 +15,7 @@ import {
   berekenMaandelijksOnttrektbaar,
   bruterDividendBox2,
   box3Heffing,
+  box3VrhJaar,
   berekenNettoBesteedbaar,
   BASE_PARAMS,
 } from '../data.js';
@@ -603,4 +604,88 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     expect(Math.round(result.nettoBesteedbaar)).toBe(783327);
   });
 
+});
+
+// ─── J. box3VrhJaar — 2028-schakelaar werkelijk-rendementstelsel ─────────────
+//
+// Staande regel volledig van kracht: handberekening opgenomen per testgeval.
+//
+// Auditlog handberekeningen (per direct voor review):
+//   Initiële berekeningen gebruikten hvv=57.000 → verkeerde asserties (2360/2059/5148).
+//   Na foutopsporing: BASE_PARAMS.heffingsvrijVermogen = 59.357 (fiscalParams.js r.94).
+//   Alle asserties gecorrigeerd naar functieverifieerde waarden; error gedocumenteerd
+//   in commit-message per staande regel.
+//
+// Gedeelde invoer voor alle J-tests:
+//   spaargeld   = 60.000
+//   beleggingen = 140.000   → totaal = 200.000
+//   fiscaalPartner = false  → hvv = 59.357 (BASE_PARAMS.heffingsvrijVermogen, fiscalParams r.94)
+//   grondslag   = max(0, 200.000 − 59.357) = 140.643
+//   grondslagVerhouding = 140.643 / 200.000 = 0,703215
+//   box3Tarief  = 0,36
+//
+// Forfait-pad (< 2028 of schakelaar=0) — BD-systematiek (zie describe H):
+//   fictiefSpaar     = 60.000 × 0,0128 = 768,000
+//   fictiefBeleg     = 140.000 × 0,06  = 8.400,000
+//   fictiefRendement = 9.168,000
+//   grondslagV.      = 140.643 / 200.000 = 0,703215
+//   VRH              = 9.168 × 0,703215 × 0,36
+//                    = 9.168 × 0,253157 = 2.320,506 → 2.321
+//
+// Werkelijk-rendement-pad (schakelaar=x%, jaar ≥ 2028):
+//   werkelijkRendement = totaal × x%
+//   VRH = werkelijkRendement × grondslagVerhouding × tarief
+//       = (200.000 × x%) × 0,703215 × 0,36
+//
+//   Bij x=4%:  VRH = 8.000 × 0,703215 × 0,36 = 5.625,72 × 0,36 = 2.025,259 → 2.025
+//   Bij x=10%: VRH = 20.000 × 0,703215 × 0,36 = 14.064,3 × 0,36 = 5.063,148 → 5.063
+//
+// Ontmaskerend (test d): bij x=10% is VRH in 2028 meer dan dubbel van forfait (5.063 vs 2.321);
+//   in 2027 is het identiek aan forfait — jaargrensbewaking wordt direct zichtbaar.
+//
+describe('J. box3VrhJaar — 2028-schakelaar werkelijk-rendementstelsel', () => {
+  // Basis params: heffingsvrijVermogen=59.357 (BASE_PARAMS), forfaitSpaar=1.28%, forfaitBeleg=6%, tarief=36%
+  const J_P = { ...BASE_PARAMS, box3WerkelijkRendement2028: 0 };
+
+  it('(a) jaar=2027, schakelaar=4% → forfait (< 2028)', () => {
+    // Ongeacht de schakelaarwaarde: jaar 2027 < 2028 → delegeer altijd naar box3Heffing.
+    // Handberekening forfait (zie header): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
+    const p = { ...J_P, box3WerkelijkRendement2028: 0.04 };
+    expect(Math.round(box3VrhJaar(60000, 140000, 2027, p))).toBe(2321);
+  });
+
+  it('(b) jaar=2028, schakelaar=0% → forfait (schakelaar uit)', () => {
+    // schakelaar=0 (default): jaar ≥ 2028 maar werkelijkPct=0 → delegeer naar box3Heffing.
+    // Handberekening forfait (zie header): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
+    const p = { ...J_P, box3WerkelijkRendement2028: 0 };
+    expect(Math.round(box3VrhJaar(60000, 140000, 2028, p))).toBe(2321);
+  });
+
+  it('(c) jaar=2028, schakelaar=4% → werkelijk rendement', () => {
+    // jaar=2028 ≥ 2028 én werkelijkPct=0,04 > 0 → werkelijk-rendementstelsel.
+    // Handberekening:
+    //   totaal              = 60.000 + 140.000 = 200.000
+    //   hvv                 = 59.357 (BASE_PARAMS, fiscaalPartner=false)
+    //   grondslag           = 200.000 − 59.357 = 140.643
+    //   grondslagVerhouding = 140.643 / 200.000 = 0,703215
+    //   werkelijkRendement  = 200.000 × 0,04   = 8.000
+    //   VRH                 = 8.000 × 0,703215 × 0,36 = 5.625,72 × 0,36 = 2.025,259 → 2.025
+    const p = { ...J_P, box3WerkelijkRendement2028: 0.04 };
+    expect(Math.round(box3VrhJaar(60000, 140000, 2028, p))).toBe(2025);
+  });
+
+  it('(d) ontmaskerend: x=10% — jaargrens 2027/2028 precies zichtbaar', () => {
+    // Hoog werkelijk rendement (10%) maakt het verschil voor vs na 2028 maximaal zichtbaar.
+    //
+    // jaar=2027 (forfait): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
+    // jaar=2028 (werkelijk 10%):
+    //   werkelijkRendement = 200.000 × 0,10 = 20.000
+    //   VRH = 20.000 × 0,703215 × 0,36 = 14.064,3 × 0,36 = 5.063,148 → 5.063
+    //
+    // Verschil = 5.063 − 2.321 = 2.742 (> 118% meer dan forfait bij 10%)
+    // Toont aan: de jaargrens 2027→2028 is exact, en de schakelaar heeft materieel effect.
+    const p = { ...J_P, box3WerkelijkRendement2028: 0.10 };
+    expect(Math.round(box3VrhJaar(60000, 140000, 2027, p))).toBe(2321);
+    expect(Math.round(box3VrhJaar(60000, 140000, 2028, p))).toBe(5063);
+  });
 });

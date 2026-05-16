@@ -152,6 +152,41 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
           <F label="Vermogensrendementsheffing (Privé) ⚠️ te verifiëren" value={+(local.vermogensrendementsheffing*100).toFixed(3)}
             onChange={v=>set('vermogensrendementsheffing')(v/100)} step={0.01} suffix="%"
             help="Box 3 effectief tarief — forfaits wijzigen jaarlijks; onder voorbehoud rechtszaak HR (2026 nog niet definitief)"/>
+
+          {/* 2028-schakelaar werkelijk-rendementstelsel */}
+          <div style={{ marginTop:'1rem', padding:'0.75rem 0.9rem', background:'rgba(99,102,241,0.06)', borderRadius:'var(--r)', border:'1px solid rgba(99,102,241,0.18)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'1rem', marginBottom:'0.5rem' }}>
+              <span style={{ fontSize:'0.82rem', fontWeight:600, color:'var(--ink)' }}>
+                Werkelijk-rendementstelsel box 3 per 2028
+              </span>
+              <button
+                type="button"
+                onClick={() => set('box3WerkelijkRendement2028')(
+                  (local.box3WerkelijkRendement2028 ?? 0) > 0 ? 0 : 0.04
+                )}
+                style={{
+                  padding:'0.25rem 0.75rem', fontSize:'0.75rem', fontWeight:600,
+                  borderRadius:'var(--r)', border:'none', cursor:'pointer',
+                  background: (local.box3WerkelijkRendement2028 ?? 0) > 0 ? 'rgba(99,102,241,0.85)' : 'rgba(0,0,0,0.08)',
+                  color: (local.box3WerkelijkRendement2028 ?? 0) > 0 ? '#fff' : 'var(--ink-muted)',
+                  transition:'background 0.15s',
+                }}
+              >
+                {(local.box3WerkelijkRendement2028 ?? 0) > 0 ? 'AAN' : 'UIT'}
+              </button>
+            </div>
+            {(local.box3WerkelijkRendement2028 ?? 0) > 0 && (
+              <F label="Aangenomen werkelijk rendement vanaf 2028"
+                value={+((local.box3WerkelijkRendement2028) * 100).toFixed(1)}
+                onChange={v => set('box3WerkelijkRendement2028')(v / 100)}
+                step={0.5} suffix="%" min={0.5} max={20}
+                help="Vervangen het forfait per 2028 — gebruikt dezelfde grondslag en heffingsvrijvermogen als het forfaitstelsel"/>
+            )}
+            <div style={{ fontSize:'0.72rem', color:'var(--ink-muted)', lineHeight:1.55, marginTop:'0.5rem' }}>
+              Invoering werkelijk-rendementstelsel per 2028 is wettelijk aangekondigd maar politiek
+              onzeker en al eerder uitgesteld — dit is een schakelbare aanname, geen voorspelling.
+            </div>
+          </div>
         </div>}
 
         {!isPrive && <div className="card">
