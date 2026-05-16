@@ -254,11 +254,21 @@ describe('F. berekenMaandelijksOnttrektbaar', () => {
 
 });
 
-// ─── G. Getrapte box 2-brutering (bruterDividendBox2) ───────────────────────
+// ─── G. bruterDividendBox2 — getrapte box 2-brutering ───────────────────────
+//
+// Nullijn-parameters (fiscalParams.js, belastingjaar 2026):
+//   box2Grens      = € 68.843  (fiscalParams.js r.58, geverifieerd)
+//                    ×2 = € 137.686 bij fiscaalPartner
+//   box2TariefLaag = 24,5%    (fiscalParams.js r.51, geverifieerd) → netto-ratio 0,755
+//   box2TariefHoog = 31%      (fiscalParams.js r.65, geverifieerd) → netto-ratio 0,69
+//
+// Alle handberekeningen in deze describe gebruiken bovenstaande nullijn-waarden
+// tenzij een individuele test expliciet afwijkt.
 
 describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
 
   it('Volledig in lage schijf (nettoNodig < €68.843 × 0.755): bruto = netto / 0.755', () => {
+    // Nullijn (zie describe G): box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51); peildatum 2026
     // €50.000 netto, geen fiscaal partner
     // nettoMaxLaag = 68.843 × (1−0,245) = 68.843 × 0,755 = 51.976,47
     // 50.000 < 51.976 → volledig lage schijf
@@ -269,6 +279,9 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
   });
 
   it('(ontmaskerend) Split lage/hoge schijf — flat-rate zou €3.497 belasting onderschatten', () => {
+    // Nullijn (zie describe G): box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51),
+    //   tariefHoog=31% (r.65), fiscaalPartner=false; peildatum 2026
+    //
     // Meest waarschijnlijke fout: flat-rate (netto / 0,755) voor elk bedrag.
     //   Flat-rate (FOUT): 80.000 / 0,755 = 105.960 bruto, belasting = 25.960
     //
@@ -291,6 +304,7 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
   it('Drempel verdubbelt bij fiscaal partner', () => {
     const zonder = bruterDividendBox2(100000, { ...BASE_PARAMS, fiscaalPartner: false });
     const met    = bruterDividendBox2(100000, { ...BASE_PARAMS, fiscaalPartner: true  });
+    // Nullijn (zie describe G): box2Grens=68.843 (r.58); peildatum 2026
     // Met partner: drempel 2×68843 = 137686 → meer in lage schijf → lagere totaalbelasting
     expect(met.belasting).toBeLessThan(zonder.belasting);
   });
@@ -302,7 +316,8 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
   });
 
   // ── 2026-nullijn benchmark (§ G5/G6) ──────────────────────────────────────
-  // Gebaseerd op geverifieerde params: box2Grens=68.843, tariefLaag=24,5%, tariefHoog=31%.
+  // Nullijn (zie describe G): box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51),
+  //   tariefHoog=31% (r.65) — geverifieerd belastingjaar 2026.
   // Eerdere benchmark (€107.022 / €29.622) was berekend met grens=67.000 + tariefHoog=33%
   // — een parametercombinatie die nooit in de codebase heeft gezeten; vervalt.
   //
@@ -342,8 +357,16 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
 
 // ─── H. box3Heffing (1c-i, structuur gecorrigeerd) ──────────────────────────
 // Belastingdienst-systematiek: fictiefRendement (op vol vermogen) → grondslagverhouding → × tarief.
-// Geverifieerde 2026-params: hvv=59.357, box3Tarief=36%, forfaitSpaar=1,28%, forfaitBeleg=6,0%.
-// Alle voorbeelden zijn met de hand narekenbaar en direct verificeerbaar.
+//
+// Nullijn-parameters (fiscalParams.js, belastingjaar 2026):
+//   heffingsvrijVermogen          = € 59.357  (fiscalParams.js r.94, geverifieerd)
+//                                   ×2 = € 118.714 bij fiscaalPartner
+//   box3Tarief                    = 36%        (fiscalParams.js r.87, geverifieerd)
+//   box3ForfaitSpaargeld          = 1,28%      (fiscalParams.js r.109, ⚠️ voorlopig 2026)
+//   box3ForfaitOverigeBezittingen = 6,0%       (fiscalParams.js r.101, geverifieerd)
+//
+// Alle handberekeningen in deze describe gebruiken bovenstaande nullijn-waarden
+// tenzij een individuele test expliciet afwijkt.
 //
 // Algebraïsche equivalentie middeling ↔ BD-systematiek (hergroepering):
 //
@@ -365,12 +388,15 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
 describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-params)', () => {
 
   it('(a) Vermogen onder vrijstelling → heffing 0', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94); peildatum 2026
     // totaal = 30.000 + 25.000 = 55.000 < hvv 59.357 → rendementsgrondslag = 0
     const h = box3Heffing(30000, 25000, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(h).toBe(0);
   });
 
   it('(b1) Puur spaargeld 200K — spaargeld-forfait 1,28%', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+    //   box3Tarief=36% (r.87); peildatum 2026
     // fictiefRendement = 200.000 × 0,0128 + 0 × 0,060 = 2.560
     // rendementsgrondslag = 200.000 − 59.357 = 140.643
     // grondslagVerhouding = 140.643 / 200.000 = 0,703215
@@ -381,6 +407,8 @@ describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-param
   });
 
   it('(b2) Puur beleggingen 200K — beleggingen-forfait 6,0%: heffing factor 4,69× hoger', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94), forfaitBeleg=6,0% (r.101),
+    //   box3Tarief=36% (r.87); peildatum 2026
     // fictiefRendement = 0 × 0,0128 + 200.000 × 0,060 = 12.000
     // rendementsgrondslag = 140.643; grondslagVerhouding = 0,703215
     // belastbaarRendement = 12.000 × 0,703215 = 8.438,58
@@ -393,6 +421,8 @@ describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-param
   });
 
   it('(c1) Zonder fiscaal partner — beleggingen 100K → heffing 878', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94), forfaitBeleg=6,0% (r.101),
+    //   box3Tarief=36% (r.87), fiscaalPartner=false; peildatum 2026
     // fictiefRendement = 100.000 × 0,060 = 6.000
     // rendementsgrondslag = 100.000 − 59.357 = 40.643
     // grondslagVerhouding = 40.643 / 100.000 = 0,40643
@@ -402,12 +432,15 @@ describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-param
   });
 
   it('(c2) Mét fiscaal partner — zelfde 100K → heffing 0 (verdubbelde vrijstelling)', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94), fiscaalPartner=true → hvv×2=118.714; peildatum 2026
     // hvv = 59.357 × 2 = 118.714 > 100.000 → rendementsgrondslag = 0
     const h = box3Heffing(0, 100000, { ...BASE_PARAMS, fiscaalPartner: true });
     expect(h).toBe(0);
   });
 
   it('(d1) Ontmaskerend geval — 500K bij 60% spaar / 40% beleg, geen partner', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+    //   forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87), fiscaalPartner=false; peildatum 2026
     // spaargeld=300.000, beleggingen=200.000; totaal=500.000
     //
     // Stap 1 — fictiefRendement op vol vermogen:
@@ -433,6 +466,8 @@ describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-param
   });
 
   it('(d2) Handmatig narekenbaar — 500K (10% spaar, 90% beleg), geen partner', () => {
+    // Nullijn (zie describe H): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+    //   forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87), fiscaalPartner=false; peildatum 2026
     // spaargeld=50.000, beleggingen=450.000; totaal=500.000
     // fictiefRendement = 50.000×0,0128 + 450.000×0,060 = 640 + 27.000 = 27.640
     // rendementsgrondslag = 440.643; grondslagVerhouding = 0,881286
@@ -445,9 +480,23 @@ describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-param
 });
 
 // ─── I. berekenNettoBesteedbaar (1c-ii, §5.2-waterfall) ─────────────────────
-// Samenstelling: latente VPB (getrapt 19%/25,8%) → latente box 2 (getrapt 24,5%/31%) →
+// Samenstelling: latente VPB (getrapt) → latente box 2 (getrapt) →
 //                privé netto (box3Heffing + eigenwoningwaarde) → netto besteedbaar.
-// Geverifieerde 2026-params uit BASE_PARAMS (vpbGrens=200K, box2Grens=68.843, hvv=59.357).
+//
+// Nullijn-parameters (fiscalParams.js, belastingjaar 2026):
+//   vpbTariefLaag                 = 19%        (fiscalParams.js r.28, geverifieerd)
+//   vpbGrens                      = € 200.000   (fiscalParams.js r.35, geverifieerd)
+//   vpbTariefHoog                 = 25,8%       (fiscalParams.js r.42, geverifieerd)
+//   box2TariefLaag                = 24,5%       (fiscalParams.js r.51, geverifieerd)
+//   box2Grens                     = € 68.843    (fiscalParams.js r.58, geverifieerd)
+//   box2TariefHoog                = 31%         (fiscalParams.js r.65, geverifieerd)
+//   heffingsvrijVermogen          = € 59.357    (fiscalParams.js r.94, geverifieerd)
+//   box3Tarief                    = 36%         (fiscalParams.js r.87, geverifieerd)
+//   box3ForfaitSpaargeld          = 1,28%       (fiscalParams.js r.109, ⚠️ voorlopig 2026)
+//   box3ForfaitOverigeBezittingen = 6,0%        (fiscalParams.js r.101, geverifieerd)
+//
+// Alle handberekeningen in deze describe gebruiken bovenstaande nullijn-waarden
+// tenzij een individuele test expliciet afwijkt.
 //
 // Auditlog handberekeningen:
 //   Test (a): eerste versie correct — alle assertions onafhankelijk berekend, geen aanpassing nodig.
@@ -463,6 +512,10 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
   const WATERFALL_P = { ...BASE_PARAMS, fiscaalPartner: false };
 
   it('(a) Volledige handberekening: BV=500K, winst=100K, privéBeleg=200K, geen woning', () => {
+    // Nullijn (zie describe I): vpbGrens=200K (r.35), vpbTariefLaag=19% (r.28),
+    //   box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51), tariefHoog=31% (r.65),
+    //   hvv=59.357 (r.94), forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
+    //
     // Invoer (alle 7 velden expliciet):
     //   bvBruto=500.000, ongerealiseerdeWinstBV=100.000, priveSpaar=0,
     //   priveBeleg=200.000, wozWaarde=0, hypotheekRestschuld=0, fiscaalPartner=false
@@ -510,6 +563,11 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
   });
 
   it('(b) Ontmaskerend — hoge koerswinst: VPB-aanname maakt €61.824 verschil', () => {
+    // Nullijn (zie describe I): vpbGrens=200K (r.35), vpbTariefLaag=19% (r.28),
+    //   vpbTariefHoog=25,8% (r.42), box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51),
+    //   tariefHoog=31% (r.65), hvv=59.357 (r.94), forfaitBeleg=6,0% (r.101),
+    //   box3Tarief=36% (r.87); peildatum 2026
+    //
     // Meest waarschijnlijke fout: stilzwijgend ongerealiseerdeWinstBV=0 (stille nul) →
     // hero-getal overschat; netto belastingdruk wordt onderschat.
     //
@@ -580,6 +638,10 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
   });
 
   it('(c) Eigen woning telt mee in privé netto', () => {
+    // Nullijn (zie describe I): vpbGrens=200K (r.35), vpbTariefLaag=19% (r.28),
+    //   box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51), tariefHoog=31% (r.65),
+    //   hvv=59.357 (r.94), forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
+    //
     // Invoer: bvBruto=500.000, ongerealiseerdeWinstBV=100.000, priveSpaar=0,
     //         priveBeleg=200.000, wozWaarde=400.000, hypotheekRestschuld=150.000,
     //         fiscaalPartner=false
@@ -610,32 +672,39 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
 //
 // Staande regel volledig van kracht: handberekening opgenomen per testgeval.
 //
+// Nullijn-parameters (fiscalParams.js, belastingjaar 2026):
+//   heffingsvrijVermogen          = € 59.357  (fiscalParams.js r.94, geverifieerd)
+//   box3Tarief                    = 36%        (fiscalParams.js r.87, geverifieerd)
+//   box3ForfaitSpaargeld          = 1,28%      (fiscalParams.js r.109, ⚠️ voorlopig 2026)
+//   box3ForfaitOverigeBezittingen = 6,0%       (fiscalParams.js r.101, geverifieerd)
+//
 // Auditlog handberekeningen (per direct voor review):
-//   Initiële berekeningen gebruikten hvv=57.000 → verkeerde asserties (2360/2059/5148).
-//   Na foutopsporing: BASE_PARAMS.heffingsvrijVermogen = 59.357 (fiscalParams.js r.94).
-//   Alle asserties gecorrigeerd naar functieverifieerde waarden; error gedocumenteerd
-//   in commit-message per staande regel.
+//   Initiële berekeningen gebruikten hvv=57.000 (uit geheugen, niet geciteerd) →
+//   verkeerde asserties (2360/2059/5148). Fout gevonden via testrun.
+//   Correcte waarde: heffingsvrijVermogen=59.357 (fiscalParams.js r.94).
+//   Alle asserties gecorrigeerd; error gedocumenteerd in commit-message per staande regel.
+//   Aanscherping staande regel (deze commit): elke handberekening citeert voortaan
+//   expliciet de nullijn-parameterherkomst — nooit uit geheugen gereproduceerde getallen.
 //
 // Gedeelde invoer voor alle J-tests:
 //   spaargeld   = 60.000
 //   beleggingen = 140.000   → totaal = 200.000
-//   fiscaalPartner = false  → hvv = 59.357 (BASE_PARAMS.heffingsvrijVermogen, fiscalParams r.94)
+//   fiscaalPartner = false  → hvv = 59.357 (fiscalParams.js r.94) — geen verdubbeling
 //   grondslag   = max(0, 200.000 − 59.357) = 140.643
 //   grondslagVerhouding = 140.643 / 200.000 = 0,703215
-//   box3Tarief  = 0,36
+//   box3Tarief  = 0,36 (fiscalParams.js r.87)
 //
 // Forfait-pad (< 2028 of schakelaar=0) — BD-systematiek (zie describe H):
-//   fictiefSpaar     = 60.000 × 0,0128 = 768,000
-//   fictiefBeleg     = 140.000 × 0,06  = 8.400,000
+//   fictiefSpaar     = 60.000 × 0,0128  = 768,000     [forfaitSpaar r.109]
+//   fictiefBeleg     = 140.000 × 0,060  = 8.400,000   [forfaitBeleg r.101]
 //   fictiefRendement = 9.168,000
 //   grondslagV.      = 140.643 / 200.000 = 0,703215
-//   VRH              = 9.168 × 0,703215 × 0,36
-//                    = 9.168 × 0,253157 = 2.320,506 → 2.321
+//   VRH              = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
 //
 // Werkelijk-rendement-pad (schakelaar=x%, jaar ≥ 2028):
 //   werkelijkRendement = totaal × x%
 //   VRH = werkelijkRendement × grondslagVerhouding × tarief
-//       = (200.000 × x%) × 0,703215 × 0,36
+//       = (200.000 × x%) × 0,703215 × 0,36 (tarief r.87)
 //
 //   Bij x=4%:  VRH = 8.000 × 0,703215 × 0,36 = 5.625,72 × 0,36 = 2.025,259 → 2.025
 //   Bij x=10%: VRH = 20.000 × 0,703215 × 0,36 = 14.064,3 × 0,36 = 5.063,148 → 5.063
@@ -644,19 +713,24 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
 //   in 2027 is het identiek aan forfait — jaargrensbewaking wordt direct zichtbaar.
 //
 describe('J. box3VrhJaar — 2028-schakelaar werkelijk-rendementstelsel', () => {
-  // Basis params: heffingsvrijVermogen=59.357 (BASE_PARAMS), forfaitSpaar=1.28%, forfaitBeleg=6%, tarief=36%
+  // Basis params (nullijn): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+  //   forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
   const J_P = { ...BASE_PARAMS, box3WerkelijkRendement2028: 0 };
 
   it('(a) jaar=2027, schakelaar=4% → forfait (< 2028)', () => {
+    // Nullijn (zie describe J): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+    //   forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
     // Ongeacht de schakelaarwaarde: jaar 2027 < 2028 → delegeer altijd naar box3Heffing.
-    // Handberekening forfait (zie header): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
+    // Handberekening forfait (zie describe J header): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
     const p = { ...J_P, box3WerkelijkRendement2028: 0.04 };
     expect(Math.round(box3VrhJaar(60000, 140000, 2027, p))).toBe(2321);
   });
 
   it('(b) jaar=2028, schakelaar=0% → forfait (schakelaar uit)', () => {
+    // Nullijn (zie describe J): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+    //   forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
     // schakelaar=0 (default): jaar ≥ 2028 maar werkelijkPct=0 → delegeer naar box3Heffing.
-    // Handberekening forfait (zie header): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
+    // Handberekening forfait (zie describe J header): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321
     const p = { ...J_P, box3WerkelijkRendement2028: 0 };
     expect(Math.round(box3VrhJaar(60000, 140000, 2028, p))).toBe(2321);
   });
@@ -664,8 +738,9 @@ describe('J. box3VrhJaar — 2028-schakelaar werkelijk-rendementstelsel', () => 
   it('(c) jaar=2028, schakelaar=4% → werkelijk rendement', () => {
     // jaar=2028 ≥ 2028 én werkelijkPct=0,04 > 0 → werkelijk-rendementstelsel.
     // Handberekening:
+    //   Nullijn: hvv=59.357 (fiscalParams.js r.94), box3Tarief=36% (r.87); peildatum 2026
     //   totaal              = 60.000 + 140.000 = 200.000
-    //   hvv                 = 59.357 (BASE_PARAMS, fiscaalPartner=false)
+    //   hvv                 = 59.357 (fiscalParams.js r.94, fiscaalPartner=false)
     //   grondslag           = 200.000 − 59.357 = 140.643
     //   grondslagVerhouding = 140.643 / 200.000 = 0,703215
     //   werkelijkRendement  = 200.000 × 0,04   = 8.000
@@ -675,6 +750,8 @@ describe('J. box3VrhJaar — 2028-schakelaar werkelijk-rendementstelsel', () => 
   });
 
   it('(d) ontmaskerend: x=10% — jaargrens 2027/2028 precies zichtbaar', () => {
+    // Nullijn (zie describe J): hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
+    //   forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
     // Hoog werkelijk rendement (10%) maakt het verschil voor vs na 2028 maximaal zichtbaar.
     //
     // jaar=2027 (forfait): VRH = 9.168 × 0,703215 × 0,36 = 2.320,506 → 2.321

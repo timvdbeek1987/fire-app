@@ -89,3 +89,32 @@ startportfolio (beleggingen-dominant aangenomen, geen spaargeld-component). Twee
 
 **Oplossing:** Voeg `priveSpaarFractie = 0` als optionele parameter toe; overweeg iteratieve
 correctie bij kleine portfolios (< 3× hvv).
+
+---
+
+## TS-06 · box3VrhJaar: werkelijk-rendement-grondslag overgenomen van forfaitair stelsel
+
+**Status:** open (bewuste implementatiekeuze, aanname op aanname)  
+**Prioriteit:** laag — zit achter prominent onzekerheidslabel; geen correctheidsfout gegeven huidige wetgeving  
+**Locatie:** `src/data.js` — `box3VrhJaar()` werkelijk-rendement-pad; `src/views/Instellingen.jsx` — toggle-label
+
+De werkelijk-rendement-variant in `box3VrhJaar` (actief wanneer `box3WerkelijkRendement2028 > 0 && jaar >= 2028`)
+berekent de heffing als:
+
+    werkelijkRendement × grondslagVerhouding × box3Tarief
+
+waarbij `grondslagVerhouding = (totaal − heffingsvrijVermogen) / totaal` en `box3Tarief = 36%`
+direct zijn overgenomen van het **forfaitaire** stelsel. Dit is een dubbele aanname:
+
+1. **Grondslag-systematiek:** Of het heffingsvrijvermogen en de grondslagverhouding-methode
+   ongewijzigd blijven in het werkelijke-rendementstelsel is niet vastgelegd in wet — de huidige
+   wetsvoorstellen bevatten afwijkende grondslagsystematiek.
+2. **Tarief:** Of het 36%-tarief ongewijzigd blijft is evenmin vastgelegd.
+
+De UI-toggle draagt het label "wettelijk aangekondigd maar politiek onzeker en al eerder uitgesteld —
+schakelbare aanname, geen voorspelling." Dit dekt de onzekerheid richting de gebruiker.
+
+**Oplossing:** Herzien zodra het werkelijke-rendementstelsel definitief in wet is vastgelegd.
+Vermoedelijk moet de grondslag worden aangepast (forfait vervalt, werkelijk rendement is de volledige
+grondslag, hvv-aftrek kan anders uitwerken). Toets dan: heeft `box3VrhJaar` een apart `grondslag`-pad
+nodig, of volstaat een parameter-update?
