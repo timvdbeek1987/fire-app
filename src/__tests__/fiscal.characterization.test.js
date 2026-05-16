@@ -330,53 +330,90 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
 
 });
 
-// ─── H. box3Heffing (1c-i) ──────────────────────────────────────────────────
+// ─── H. box3Heffing (1c-i, structuur gecorrigeerd) ──────────────────────────
+// Belastingdienst-systematiek: fictiefRendement (op vol vermogen) → grondslagverhouding → × tarief.
 // Geverifieerde 2026-params: hvv=59.357, box3Tarief=36%, forfaitSpaar=1,28%, forfaitBeleg=6,0%.
-// Alle voorbeelden zijn met de hand narekenbaar.
+// Alle voorbeelden zijn met de hand narekenbaar en direct verificeerbaar.
+//
+// Structuurwijziging t.o.v. eerste 1c-i-commit: "forfait-middeling" (gewogenForfait × grondslag)
+// vervangen door de BD-stappen. Mathematisch equivalent (float-verschil < 1e-12).
+// Karakterisatiedelta's ongewijzigd — zie annotaties bij tests C/D/F.
 
-describe('H. box3Heffing — correcte stock-modellering met heffingsvrijvermogen', () => {
+describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-params)', () => {
 
   it('(a) Vermogen onder vrijstelling → heffing 0', () => {
-    // totaal = 30000 + 25000 = 55000 < hvv 59357 → grondslag = 0
+    // totaal = 30.000 + 25.000 = 55.000 < hvv 59.357 → rendementsgrondslag = 0
     const h = box3Heffing(30000, 25000, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(h).toBe(0);
   });
 
-  it('(b1) Puur spaargeld 200K: heffing op basis van spaargeld-forfait 1,28%', () => {
-    // grondslag = 200000 − 59357 = 140643
-    // heffing = 140643 × 0.0128 × 0.36 = 648
+  it('(b1) Puur spaargeld 200K — spaargeld-forfait 1,28%', () => {
+    // fictiefRendement = 200.000 × 0,0128 + 0 × 0,060 = 2.560
+    // rendementsgrondslag = 200.000 − 59.357 = 140.643
+    // grondslagVerhouding = 140.643 / 200.000 = 0,703215
+    // belastbaarRendement = 2.560 × 0,703215 = 1.800,23
+    // heffing = 1.800,23 × 0,36 = 648
     const h = box3Heffing(200000, 0, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(Math.round(h)).toBe(648);
   });
 
-  it('(b2) Puur beleggingen 200K: heffing aantoonbaar hoger dan spaargeld-geval', () => {
-    // grondslag = 140643; heffing = 140643 × 0.060 × 0.36 = 3038
-    // Ratio beleggingen/spaargeld = 3038/648 = 4.69 (= 6%/1.28%)
+  it('(b2) Puur beleggingen 200K — beleggingen-forfait 6,0%: heffing factor 4,69× hoger', () => {
+    // fictiefRendement = 0 × 0,0128 + 200.000 × 0,060 = 12.000
+    // rendementsgrondslag = 140.643; grondslagVerhouding = 0,703215
+    // belastbaarRendement = 12.000 × 0,703215 = 8.438,58
+    // heffing = 8.438,58 × 0,36 = 3.038
+    // Verhouding 3038/648 = 4,69 = forfait-verhouding 6,0%/1,28%
     const hSpaar = box3Heffing(200000, 0,      { ...BASE_PARAMS, fiscaalPartner: false });
     const hBeleg = box3Heffing(0,      200000, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(Math.round(hBeleg)).toBe(3038);
     expect(hBeleg).toBeGreaterThan(hSpaar);
   });
 
-  it('(c1) Zonder fiscaal partner: beleggingen 100K → heffing 878', () => {
-    // grondslag = 100000 − 59357 = 40643
-    // heffing = 40643 × 0.060 × 0.36 = 878
+  it('(c1) Zonder fiscaal partner — beleggingen 100K → heffing 878', () => {
+    // fictiefRendement = 100.000 × 0,060 = 6.000
+    // rendementsgrondslag = 100.000 − 59.357 = 40.643
+    // grondslagVerhouding = 40.643 / 100.000 = 0,40643
+    // heffing = 6.000 × 0,40643 × 0,36 = 878
     const h = box3Heffing(0, 100000, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(Math.round(h)).toBe(878);
   });
 
-  it('(c2) Mét fiscaal partner: zelfde 100K → heffing 0 (onder verdubbelde vrijstelling)', () => {
-    // hvv = 59357 × 2 = 118714 > 100000 → grondslag = 0
+  it('(c2) Mét fiscaal partner — zelfde 100K → heffing 0 (verdubbelde vrijstelling)', () => {
+    // hvv = 59.357 × 2 = 118.714 > 100.000 → rendementsgrondslag = 0
     const h = box3Heffing(0, 100000, { ...BASE_PARAMS, fiscaalPartner: true });
     expect(h).toBe(0);
   });
 
-  it('(d) Handmatig narekenbaar — gemengd portfolio 500K (10% spaar, 90% beleg)', () => {
-    // spaargeld=50000, beleggingen=450000; totaal=500000
-    // hvv=59357; grondslag=440643
-    // gewogenForfait = (50000×0.0128 + 450000×0.060) / 500000
-    //               = (640 + 27000) / 500000 = 27640/500000 = 0.05528
-    // heffing = 440643 × 0.05528 × 0.36 = 8769
+  it('(d1) Ontmaskerend geval — 500K bij 60% spaar / 40% beleg, geen partner', () => {
+    // spaargeld=300.000, beleggingen=200.000; totaal=500.000
+    //
+    // Stap 1 — fictiefRendement op vol vermogen:
+    //   300.000 × 0,0128 + 200.000 × 0,060 = 3.840 + 12.000 = 15.840
+    //
+    // Stap 2 — rendementsgrondslag:
+    //   500.000 − 59.357 = 440.643
+    //
+    // Stap 3 — grondslagVerhouding:
+    //   440.643 / 500.000 = 0,881286
+    //
+    // Stap 4 — belastbaarRendement:
+    //   15.840 × 0,881286 = 13.959,57
+    //
+    // Stap 5 — heffing:
+    //   13.959,57 × 0,36 = 5.025
+    //
+    // Naïeve fout (hvv alleen van spaargeld aftrekken):
+    //   (300K-59357)×0,0128×0,36 + 200K×0,06×0,36 = 1.109 + 4.320 = 5.429 ← FOUT
+    const h = box3Heffing(300000, 200000, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(h)).toBe(5025);
+  });
+
+  it('(d2) Handmatig narekenbaar — 500K (10% spaar, 90% beleg), geen partner', () => {
+    // spaargeld=50.000, beleggingen=450.000; totaal=500.000
+    // fictiefRendement = 50.000×0,0128 + 450.000×0,060 = 640 + 27.000 = 27.640
+    // rendementsgrondslag = 440.643; grondslagVerhouding = 0,881286
+    // belastbaarRendement = 27.640 × 0,881286 = 24.358,74
+    // heffing = 24.358,74 × 0,36 = 8.769
     const h = box3Heffing(50000, 450000, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(Math.round(h)).toBe(8769);
   });

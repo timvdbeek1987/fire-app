@@ -266,8 +266,14 @@ export function bruterDividendBox2(nettoNodig, p) {
 /**
  * Berekent de jaarlijkse box 3-heffing (VRH) op basis van de werkelijke vermogenssplit.
  *
+ * Volgt de Belastingdienst-systematiek stap voor stap (verificeerbaar tegen ambtelijke publicaties):
+ *   1. fictiefRendement = spaargeld × forfaitSpaar + beleggingen × forfaitBeleg   (op vol vermogen)
+ *   2. rendementsgrondslag = totaal − heffingsvrijVermogen (×2 bij fiscaalPartner)
+ *   3. grondslagverhouding = rendementsgrondslag / totaal
+ *   4. belastbaarRendement = fictiefRendement × grondslagverhouding
+ *   5. heffing = belastbaarRendement × box3Tarief
+ *
  * Model: forfaitair stelsel — tegenbewijsregeling en schuldenaftrek niet gemodelleerd (zie TECHSCHULD.md).
- * Heffingsvrijvermogen wordt toegepast vóór het forfait.
  * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
  *
  * @param {number} spaargeld    Spaargeldcomponent van het privé-vermogen (€, begin van het jaar)
@@ -279,19 +285,19 @@ export function box3Heffing(spaargeld, beleggingen, p) {
   const totaal = spaargeld + beleggingen;
   if (totaal <= 0) return 0;
 
-  const hvv       = vereist(p, 'heffingsvrijVermogen') * (p.fiscaalPartner ? 2 : 1);
-  const grondslag = Math.max(0, totaal - hvv);
-  if (grondslag === 0) return 0;
+  const hvv              = vereist(p, 'heffingsvrijVermogen') * (p.fiscaalPartner ? 2 : 1);
+  const rendementsGrondslag = Math.max(0, totaal - hvv);
+  if (rendementsGrondslag === 0) return 0;
 
-  const forfaitSpaar = vereist(p, 'box3ForfaitSpaargeld');
-  const forfaitBeleg = vereist(p, 'box3ForfaitOverigeBezittingen');
-  const tarief       = vereist(p, 'box3Tarief');
+  // Stap 1: forfaitair rendement op het volledige vermogen per categorie
+  const fictiefRendement = spaargeld * vereist(p, 'box3ForfaitSpaargeld')
+                         + beleggingen * vereist(p, 'box3ForfaitOverigeBezittingen');
 
-  // Gewogen gemiddeld forfait: rato spaargeld/beleggingen in het totale vermogen
-  const gewogenForfait = (spaargeld * forfaitSpaar + beleggingen * forfaitBeleg) / totaal;
+  // Stap 2: aandeel van de rendementsgrondslag in het totale vermogen
+  const grondslagVerhouding = rendementsGrondslag / totaal;
 
-  // Fictief rendement × IB-tarief, toegepast op de grondslag boven de vrijstelling
-  return grondslag * gewogenForfait * tarief;
+  // Stap 3: heffing = belastbaar fictief rendement × IB-tarief
+  return fictiefRendement * grondslagVerhouding * vereist(p, 'box3Tarief');
 }
 
 function runSinglePath(p, start, so, randNorm, strategie = null) {
