@@ -14,6 +14,7 @@ import {
   berekenVereistKapitaalAnalytisch,
   berekenMaandelijksOnttrektbaar,
   bruterDividendBox2,
+  box3Heffing,
   BASE_PARAMS,
 } from '../data.js';
 
@@ -129,13 +130,18 @@ describe('C. VRH / Box 3 (privé-gebruiker)', () => {
     vennootschapsbelasting: 0,
     inkomstenbelasting:     0,
     priveModus:             true,
-    vermogensrendementsheffing: 0.02088,
+    // vermogensrendementsheffing: 0.02088 — override irrelevant na 1c-i:
+    // engine gebruikt box3Heffing(priveSpaar, priveBeleg, p) met heffingsvrijvermogen uit BASE_PARAMS
   };
 
-  it('Privé prive=500K: priveP50 na eerste jaar = 401692 (VRH verwerkt)', () => {
+  it('Privé prive=500K: priveP50 na eerste jaar = 402538 (box3Heffing met heffingsvrijvermogen)', () => {
+    // UPDATE 1c-i: box3Heffing vervangt prive × vermogensrendementsheffing × frac.
+    // box3Heffing(0, 500000, p): grondslag = 500000 − 59357 = 440643; forfait 6% × tarief 36% = 9518/j.
+    // Oud (flat 2.088%): 500000 × 0.02088 = 10440/j → 922 méér VRH/j → lagere balans.
+    // Nieuw: minder VRH door vrijstelling → priveP50 hoger. Delta: 401692 → 402538 (+846)
     const startPrive = { bv: 0, prive: 500_000, jaar: 2025, maand: 1 };
     const mc = runMonteCarlo(PRIVE_PARAMS, startPrive, 1);
-    expect(mc.years[0].priveP50).toBe(401692);
+    expect(mc.years[0].priveP50).toBe(402538);
   });
 
 });
@@ -166,20 +172,24 @@ describe('D. runMonteCarlo deterministisch (zelfde seed bij zelfde params)', () 
     expect(run.kansSucces).toBe(100);
   });
 
-  it('bvP50 op leeftijd 60 = 430281 (snapshot)', () => {
+  it('bvP50 op leeftijd 60 = 441259 (snapshot)', () => {
     const run = runMonteCarlo(PARAMS_D, START_D, 2500);
     const r60 = run.years.find(r => r.leeftijd === 60);
     // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 471801 → 430892
     // UPDATE box3 params: VRH 2.088% → 2.160% (6,0% forfait × 36% tarief, beide definitief 2026). Delta: 430892 → 430281 (−611)
-    expect(r60?.bvP50).toBe(430281);
+    // UPDATE 1c-i: box3Heffing met heffingsvrijvermogen. START_D heeft prive=100K; grondslag=40643 (ipv 100K).
+    //   VRH oud (flat): 100K × 2.16% = 2160/j; nieuw: 40643 × 6% × 36% = 878/j → 1282/j minder → privé groeit sneller.
+    //   Delta: 430281 → 441259 (+10978). BV onveranderd — bvP50 = BV-component van totaal.
+    expect(r60?.bvP50).toBe(441259);
   });
 
-  it('totaalP50 op leeftijd 60 = 537695 (snapshot)', () => {
+  it('totaalP50 op leeftijd 60 = 554636 (snapshot)', () => {
     const run = runMonteCarlo(PARAMS_D, START_D, 2500);
     const r60 = run.years.find(r => r.leeftijd === 60);
     // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 579497 → 538807
     // UPDATE box3 params: VRH 2.088% → 2.160% (6,0% forfait × 36% tarief, beide definitief 2026). Delta: 538807 → 537695 (−1112)
-    expect(r60?.totaalP50).toBe(537695);
+    // UPDATE 1c-i: box3Heffing met heffingsvrijvermogen — privé-component groeit harder. Delta: 537695 → 554636 (+16941)
+    expect(r60?.totaalP50).toBe(554636);
   });
 
 });
@@ -212,16 +222,22 @@ describe('E. berekenVereistKapitaalAnalytisch', () => {
 
 describe('F. berekenMaandelijksOnttrektbaar', () => {
 
-  it('Portfolio 1M, 10 jaar tot pensioen: maandelijks onttrektbaar = 2248', () => {
+  it('Portfolio 1M, 10 jaar tot pensioen: maandelijks onttrektbaar = 2305', () => {
     // UPDATE box3 params: VRH 2.088% → 2.160%. Delta: 2274 → 2248 (−26)
+    // UPDATE 1c-i: box3Heffing past heffingsvrijvermogen toe op startportfolio (beleggingen-dominant).
+    //   portfolioReeel ≈ 820K (na inflatie); effectief tarief = (820K-59357)×6%×36% / 820K ≈ 2.01%.
+    //   Lager tarief → hogere netto-rente → meer onttrektbaar. Delta: 2248 → 2305 (+57)
     const mnd = berekenMaandelijksOnttrektbaar(BASE_PARAMS, 1_000_000, 10);
-    expect(mnd).toBe(2248);
+    expect(mnd).toBe(2305);
   });
 
-  it('Portfolio 500K, 5 jaar tot pensioen: maandelijks onttrektbaar = 1241', () => {
+  it('Portfolio 500K, 5 jaar tot pensioen: maandelijks onttrektbaar = 1299', () => {
     // UPDATE box3 params: VRH 2.088% → 2.160%. Delta: 1255 → 1241 (−14)
+    // UPDATE 1c-i: box3Heffing past heffingsvrijvermogen toe op startportfolio (beleggingen-dominant).
+    //   portfolioReeel ≈ 453K; effectief tarief = (453K-59357)×6%×36% / 453K ≈ 1.87%.
+    //   Delta: 1241 → 1299 (+58)
     const mnd = berekenMaandelijksOnttrektbaar(BASE_PARAMS, 500_000, 5);
-    expect(mnd).toBe(1241);
+    expect(mnd).toBe(1299);
   });
 
   it('Grotere portfolio geeft hogere maandelijkse onttrekking', () => {
@@ -310,6 +326,59 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
     expect(r.inHoogSchijf).toBe(0);
     // Belasting is exact bruto × 24,5% (volledig lage schijf)
     expect(Math.round(r.belasting)).toBe(Math.round(r.bruto * 0.245));
+  });
+
+});
+
+// ─── H. box3Heffing (1c-i) ──────────────────────────────────────────────────
+// Geverifieerde 2026-params: hvv=59.357, box3Tarief=36%, forfaitSpaar=1,28%, forfaitBeleg=6,0%.
+// Alle voorbeelden zijn met de hand narekenbaar.
+
+describe('H. box3Heffing — correcte stock-modellering met heffingsvrijvermogen', () => {
+
+  it('(a) Vermogen onder vrijstelling → heffing 0', () => {
+    // totaal = 30000 + 25000 = 55000 < hvv 59357 → grondslag = 0
+    const h = box3Heffing(30000, 25000, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(h).toBe(0);
+  });
+
+  it('(b1) Puur spaargeld 200K: heffing op basis van spaargeld-forfait 1,28%', () => {
+    // grondslag = 200000 − 59357 = 140643
+    // heffing = 140643 × 0.0128 × 0.36 = 648
+    const h = box3Heffing(200000, 0, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(h)).toBe(648);
+  });
+
+  it('(b2) Puur beleggingen 200K: heffing aantoonbaar hoger dan spaargeld-geval', () => {
+    // grondslag = 140643; heffing = 140643 × 0.060 × 0.36 = 3038
+    // Ratio beleggingen/spaargeld = 3038/648 = 4.69 (= 6%/1.28%)
+    const hSpaar = box3Heffing(200000, 0,      { ...BASE_PARAMS, fiscaalPartner: false });
+    const hBeleg = box3Heffing(0,      200000, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(hBeleg)).toBe(3038);
+    expect(hBeleg).toBeGreaterThan(hSpaar);
+  });
+
+  it('(c1) Zonder fiscaal partner: beleggingen 100K → heffing 878', () => {
+    // grondslag = 100000 − 59357 = 40643
+    // heffing = 40643 × 0.060 × 0.36 = 878
+    const h = box3Heffing(0, 100000, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(h)).toBe(878);
+  });
+
+  it('(c2) Mét fiscaal partner: zelfde 100K → heffing 0 (onder verdubbelde vrijstelling)', () => {
+    // hvv = 59357 × 2 = 118714 > 100000 → grondslag = 0
+    const h = box3Heffing(0, 100000, { ...BASE_PARAMS, fiscaalPartner: true });
+    expect(h).toBe(0);
+  });
+
+  it('(d) Handmatig narekenbaar — gemengd portfolio 500K (10% spaar, 90% beleg)', () => {
+    // spaargeld=50000, beleggingen=450000; totaal=500000
+    // hvv=59357; grondslag=440643
+    // gewogenForfait = (50000×0.0128 + 450000×0.060) / 500000
+    //               = (640 + 27000) / 500000 = 27640/500000 = 0.05528
+    // heffing = 440643 × 0.05528 × 0.36 = 8769
+    const h = box3Heffing(50000, 450000, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(h)).toBe(8769);
   });
 
 });

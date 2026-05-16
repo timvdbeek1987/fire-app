@@ -88,7 +88,13 @@ export const BASE_PARAMS = {
   // Dividendbelasting bronheffing
   dividendbelastingVoorheffing: _fp.dividendbelastingVoorheffing,
   // Box 3 / VRH (huidig forfaitair stelsel — onder voorbehoud rechtszaak)
-  vermogensrendementsheffing: _fp.vermogensrendementsheffing,
+  box3Tarief:                       _fp.box3Tarief,
+  heffingsvrijVermogen:             _fp.heffingsvrijVermogen,
+  box3ForfaitOverigeBezittingen:    _fp.box3ForfaitOverigeBezittingen,
+  box3ForfaitSpaargeld:             _fp.box3ForfaitSpaargeld,
+  box3ForfaitSchulden:              _fp.box3ForfaitSchulden,
+  // Afgeleid effectief tarief — uitsluitend nog als referentiewaarde; engine gebruikt box3Heffing().
+  vermogensrendementsheffing:       _fp.vermogensrendementsheffing,
   // Inkomstenbelasting (globale effectieve tarieven — pas aan op eigen situatie)
   inkomstenbelasting:         _fp.inkomstenbelasting,
   // DEPRECATED ALIAS — uitsluitend als hash-anker in paramsToSeed (seed-stabiliteit voor nSims=1 tests).
@@ -257,6 +263,37 @@ export function bruterDividendBox2(nettoNodig, p) {
   };
 }
 
+/**
+ * Berekent de jaarlijkse box 3-heffing (VRH) op basis van de werkelijke vermogenssplit.
+ *
+ * Model: forfaitair stelsel — tegenbewijsregeling en schuldenaftrek niet gemodelleerd (zie TECHSCHULD.md).
+ * Heffingsvrijvermogen wordt toegepast vóór het forfait.
+ * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
+ *
+ * @param {number} spaargeld    Spaargeldcomponent van het privé-vermogen (€, begin van het jaar)
+ * @param {number} beleggingen  Beleggingscomponent van het privé-vermogen (€, begin van het jaar)
+ * @param {object} p            Params-object (box3ForfaitSpaargeld/Bezittingen/Tarief, heffingsvrijVermogen)
+ * @returns {number}            Jaarlijkse heffing in euro's — vermenigvuldig met frac voor fractioneel jaar
+ */
+export function box3Heffing(spaargeld, beleggingen, p) {
+  const totaal = spaargeld + beleggingen;
+  if (totaal <= 0) return 0;
+
+  const hvv       = vereist(p, 'heffingsvrijVermogen') * (p.fiscaalPartner ? 2 : 1);
+  const grondslag = Math.max(0, totaal - hvv);
+  if (grondslag === 0) return 0;
+
+  const forfaitSpaar = vereist(p, 'box3ForfaitSpaargeld');
+  const forfaitBeleg = vereist(p, 'box3ForfaitOverigeBezittingen');
+  const tarief       = vereist(p, 'box3Tarief');
+
+  // Gewogen gemiddeld forfait: rato spaargeld/beleggingen in het totale vermogen
+  const gewogenForfait = (spaargeld * forfaitSpaar + beleggingen * forfaitBeleg) / totaal;
+
+  // Fictief rendement × IB-tarief, toegepast op de grondslag boven de vrijstelling
+  return grondslag * gewogenForfait * tarief;
+}
+
 function runSinglePath(p, start, so, randNorm, strategie = null) {
   const birthYear = p.geboortejaar ?? BIRTH_YEAR;
 
@@ -348,7 +385,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendSpaarBVn = rendSpaarBVb - vpbSpaar;
 
       const rendBelegPvb = (priveBeleg + inPv * 0.5) * jaarR;
-      const vrh          = prive * p.vermogensrendementsheffing * frac;
+      // box3Heffing: correct forfait met heffingsvrijvermogen — vervangt prive × vermogensrendementsheffing × frac
+      const vrh          = box3Heffing(priveSpaar, priveBeleg, p) * frac;
       const rendBelegPvn = rendBelegPvb - vrh;
 
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
@@ -403,7 +441,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendBVn = rendBVb - vpb;
 
       const rendPvb = prive * jaarR;
-      const vrh     = prive * p.vermogensrendementsheffing * frac;
+      // box3Heffing: correct forfait met heffingsvrijvermogen — vervangt prive × vermogensrendementsheffing × frac
+      const vrh     = box3Heffing(priveSpaar, priveBeleg, p) * frac;
       const rendPvn = rendPvb - vrh;
 
       const aflosJaar    = p.hypotheekAflosJaar    ?? 2040;
@@ -518,7 +557,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
       const rendSpaarPvn = priveSpaar * spaarRentePv * frac;
       const rendBelegPvb = priveBeleg * jaarR;
-      const vrhPv        = prive * p.vermogensrendementsheffing * frac;
+      // box3Heffing: correct forfait met heffingsvrijvermogen — vervangt prive × vermogensrendementsheffing × frac
+      const vrhPv        = box3Heffing(priveSpaar, priveBeleg, p) * frac;
       const rendBelegPvn = rendBelegPvb - vrhPv;
       priveBeleg = Math.max(0, priveBeleg + rendBelegPvn - ontPv * (priveBeleg / Math.max(1, prive)));
       priveSpaar = Math.max(0, priveSpaar + rendSpaarPvn - ontPv * (priveSpaar / Math.max(1, prive)));
@@ -984,13 +1024,15 @@ export function berekenMaandelijksOnttrektbaar(params, portfolioNominaalPensioen
   const nMaanden = Math.max(12, (uitputtingLft - pensioenLft) * 12);
 
   const rNominaalJaar = p.rendementNaPensioen ?? 0.05;
-  const vrh           = vereist(p, 'vermogensrendementsheffing');
   const inflatie      = p.inflatieGemiddeld ?? 0.02;
 
   const cumulInflatie  = Math.pow(1 + inflatie, Math.max(0, jaarTotPensioen));
   const portfolioReeel = portfolioNominaalPensioen / cumulInflatie;
 
-  const rNettoJaar = (1 + rNominaalJaar - vrh) / (1 + inflatie) - 1;
+  // box3Heffing: beleggingen-dominant aangenomen (priveSpaar=0); heffingsvrijvermogen op startportfolio toegepast.
+  // Vereenvoudiging: negeert uitputting en spaargeld-fractie (zie TECHSCHULD.md).
+  const vrhJaar    = portfolioReeel > 0 ? box3Heffing(0, portfolioReeel, p) / portfolioReeel : 0;
+  const rNettoJaar = (1 + rNominaalJaar - vrhJaar) / (1 + inflatie) - 1;
   const rMaand     = Math.pow(1 + Math.max(-0.5, rNettoJaar), 1 / 12) - 1;
 
   if (portfolioReeel <= 0) return 0;
