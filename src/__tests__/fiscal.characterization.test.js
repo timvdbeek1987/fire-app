@@ -258,24 +258,32 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
 
   it('Volledig in lage schijf (nettoNodig < €68.843 × 0.755): bruto = netto / 0.755', () => {
     // €50.000 netto, geen fiscaal partner
-    // Laag schijf max netto: 68843 × (1-0.245) = 51.975,65
-    // €50.000 < €51.975 → volledig laag schijf
-    // Verwacht bruto: 50000 / 0.755 = 66.225,17 → afgerond
+    // nettoMaxLaag = 68.843 × (1−0,245) = 68.843 × 0,755 = 51.976,47
+    // 50.000 < 51.976 → volledig lage schijf
+    // bruto = 50.000 / 0,755 = 66.225,17 → afgerond 66.225
     const r = bruterDividendBox2(50000, { ...BASE_PARAMS });
     expect(Math.round(r.bruto)).toBe(66225);
     expect(r.inHoogSchijf).toBe(0);
   });
 
-  it('Deels hoge schijf (nettoNodig > €51.975): split over twee schijven', () => {
-    // €80.000 netto, geen fiscaal partner
-    // Lage schijf: 68843 bruto → 68843 × 0.755 = 51.975,47 netto
-    // Rest: 80000 - 51975 = 28025 netto via hoge schijf → 28025 / 0.69 = 40.615 bruto
-    // Totaal bruto ≈ 68843 + 40615 = 109.458
-    const r = bruterDividendBox2(80000, { ...BASE_PARAMS });
-    expect(Math.round(r.bruto)).toBeGreaterThan(109000);
-    expect(r.inHoogSchijf).toBeGreaterThan(0);
-    // Belasting = bruto - netto
-    expect(Math.round(r.belasting)).toBe(Math.round(r.bruto) - 80000);
+  it('(ontmaskerend) Split lage/hoge schijf — flat-rate zou €3.497 belasting onderschatten', () => {
+    // Meest waarschijnlijke fout: flat-rate (netto / 0,755) voor elk bedrag.
+    //   Flat-rate (FOUT): 80.000 / 0,755 = 105.960 bruto, belasting = 25.960
+    //
+    // Correcte tiered berekening — €80.000 netto, geen fiscaal partner:
+    //   nettoMaxLaag = 68.843 × (1−0,245) = 68.843 × 0,755 = 51.976,47
+    //   80.000 > 51.976 → split noodzakelijk
+    //   brutoLaag    = 68.843
+    //   nettoLaag    = 51.976,47
+    //   brutoHoog    = (80.000 − 51.976,47) / (1−0,31) = 28.023,53 / 0,69 = 40.613,82
+    //   bruto        = 68.843 + 40.613,82 = 109.456,82 → 109.457
+    //   belasting    = 109.456,82 − 80.000 = 29.456,82 → 29.457
+    //   inHoogSchijf = 40.613,82 → 40.614
+    const r = bruterDividendBox2(80000, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(r.bruto)).toBe(109457);
+    expect(Math.round(r.belasting)).toBe(29457);
+    expect(r.inLaagSchijf).toBe(68843);
+    expect(Math.round(r.inHoogSchijf)).toBe(40614);
   });
 
   it('Drempel verdubbelt bij fiscaal partner', () => {
@@ -335,9 +343,22 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
 // Geverifieerde 2026-params: hvv=59.357, box3Tarief=36%, forfaitSpaar=1,28%, forfaitBeleg=6,0%.
 // Alle voorbeelden zijn met de hand narekenbaar en direct verificeerbaar.
 //
-// Structuurwijziging t.o.v. eerste 1c-i-commit: "forfait-middeling" (gewogenForfait × grondslag)
-// vervangen door de BD-stappen. Mathematisch equivalent (float-verschil < 1e-12).
-// Karakterisatiedelta's ongewijzigd — zie annotaties bij tests C/D/F.
+// Algebraïsche equivalentie middeling ↔ BD-systematiek (hergroepering):
+//
+//   Middeling (eerste 1c-i-commit):
+//     gewogenForfait  = (spaar×fS + beleg×fB) / totaal
+//     heffing         = gewogenForfait × grondslag × tarief
+//                     = [(spaar×fS + beleg×fB) / totaal] × grondslag × tarief
+//
+//   BD-systematiek (huidige code):
+//     fictiefR        = spaar×fS + beleg×fB
+//     grondslagV      = grondslag / totaal
+//     heffing         = fictiefR × grondslagV × tarief
+//                     = (spaar×fS + beleg×fB) × (grondslag / totaal) × tarief
+//                     = [(spaar×fS + beleg×fB) / totaal] × grondslag × tarief   ← identiek
+//
+//   Gelijk door hergroepering van vermenigvuldiging — geen gedragswijziging.
+//   Karakterisatiedelta's ongewijzigd — zie annotaties bij tests C/D/F.
 
 describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-params)', () => {
 
@@ -400,10 +421,11 @@ describe('H. box3Heffing — BD-systematiek met heffingsvrijvermogen (2026-param
     //   15.840 × 0,881286 = 13.959,57
     //
     // Stap 5 — heffing:
-    //   13.959,57 × 0,36 = 5.025
+    //   13.959,57 × 0,36 = 5.025,44 → afgerond 5.025
     //
-    // Naïeve fout (hvv alleen van spaargeld aftrekken):
-    //   (300K-59357)×0,0128×0,36 + 200K×0,06×0,36 = 1.109 + 4.320 = 5.429 ← FOUT
+    // Naïeve fout — proportioneel-per-categorie (hvv volledig op spaargeld geboekt, nooit in productie):
+    //   Per-categorie: spaarGrondslag=300K−59.357=240.643; belegGrondslag=200K (geen aftrek) — FOUT
+    //   (240.643×0,0128 + 200.000×0,060) × 0,36 = (3.080 + 12.000) × 0,36 = 5.429 ← FOUT (+€404 te veel)
     const h = box3Heffing(300000, 200000, { ...BASE_PARAMS, fiscaalPartner: false });
     expect(Math.round(h)).toBe(5025);
   });

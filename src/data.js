@@ -229,6 +229,23 @@ function vereist(p, sleutel) {
  * @param {object} p           Params-object (moet box2TariefLaag/Hoog/Grens bevatten)
  * @returns {{ bruto: number, belasting: number, inLaagSchijf: number, inHoogSchijf: number }}
  */
+/**
+ * Berekent het benodigde bruto dividend om een gewenst nettobedrag over te houden na box 2-heffing.
+ *
+ * Volgt het getrapte box 2-stelsel:
+ *   - Lage schijf : tariefLaag (24,5% in 2026) over eerste box2Grens bruto (×2 bij fiscaalPartner)
+ *   - Hoge schijf : tariefHoog (31,0% in 2026) over het meerdere
+ *
+ * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
+ *
+ * @param {number} nettoNodig  Gewenst netto-bedrag na box 2-belasting (€)
+ * @param {object} p           Params-object (box2Grens, box2TariefLaag, box2TariefHoog, fiscaalPartner)
+ * @returns {{ bruto: number, belasting: number, inLaagSchijf: number, inHoogSchijf: number }}
+ *   bruto        = benodigde dividenduitkering vóór belasting
+ *   belasting    = bruto − nettoNodig
+ *   inLaagSchijf = bruto-deel belast in lage schijf
+ *   inHoogSchijf = bruto-deel belast in hoge schijf (0 als volledig in lage schijf)
+ */
 export function bruterDividendBox2(nettoNodig, p) {
   if (nettoNodig <= 0) return { bruto: 0, belasting: 0, inLaagSchijf: 0, inHoogSchijf: 0 };
 
