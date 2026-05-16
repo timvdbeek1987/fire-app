@@ -285,12 +285,19 @@ export function bruterDividendBox2(nettoNodig, p) {
 /**
  * Berekent de §5.2-waterfall: netto besteedbaar vandaag vanuit bruto BV-vermogen.
  *
- * Samenstelling van bestaande afgetekende functies — geen nieuwe fiscale regels:
+ * SPEC §5.2 (gecorrigeerd): het hero-getal is uitsluitend besteedbaar vermogen.
+ * Eigenwoning-overwaarde (WOZ − hypotheek) is GEEN term in nettoBesteedbaar; hij wordt
+ * apart teruggegeven als `nietLiquideVermogen`. Verzilvering (verkleinen/herfinancieren)
+ * is een toekomstige scenario-hefboom — bewust buiten het besteedbare getal gehouden,
+ * analoog aan de 2028-schakelaar.
+ *
+ * Waterfall:
  *   Stap 1  Latente VPB op ongerealiseerde koerswinst (getrapt 19% / 25,8% over €200K-grens)
  *   Stap 2  BV na latente VPB
  *   Stap 3  Latente box 2 op uitkeerbaar BV-vermogen (getrapt 24,5% / 31%, ×2 bij fiscaalPartner)
- *   Stap 4  Privé netto = privévermogen − VRH (box3Heffing) + eigenwoningwaarde
- *   Stap 5  Netto besteedbaar = bvNaVpb − latenteBox2 + priveNetto
+ *   Stap 4  Privé netto = privévermogen − VRH (box3Heffing)   [eigenWoning NIET opgeteld]
+ *   Stap 5  Netto besteedbaar = (bvNaVpb − latenteBox2) + priveNetto
+ *   Apart   Niet-liquide vermogen = max(0, WOZ − hypotheek)   [apart veld, niet in hero-getal]
  *
  * ongerealiseerdeWinstBV = 0 → stap 1 slaat over (label "excl. latente VPB" in UI).
  * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
@@ -304,7 +311,7 @@ export function bruterDividendBox2(nettoNodig, p) {
  *   hypotheekRestschuld    — resterende hypotheekschuld (€)
  *   p                      — params-object
  * @returns {{ bvBruto, latenteVpb, bvNaVpb, latenteBox2, box2InLaag, box2InHoog,
- *             priveVermogen, vrh, eigenWoningNetto, priveNetto, nettoBesteedbaar }}
+ *             priveVermogen, vrh, priveNetto, nettoBesteedbaar, nietLiquideVermogen }}
  */
 export function berekenNettoBesteedbaar({
   bvBruto,
@@ -348,14 +355,19 @@ export function berekenNettoBesteedbaar({
     latenteBox2 = box2Grens * box2TariefLaag + (bvNaVpb - box2Grens) * box2TariefHoog;
   }
 
-  // ── Stap 4: privé netto ────────────────────────────────────────────────────
-  const vrh              = box3Heffing(priveSpaar, priveBeleg, p);
-  const priveVermogen    = priveSpaar + priveBeleg;
-  const eigenWoningNetto = Math.max(0, (wozWaarde ?? 0) - (hypotheekRestschuld ?? 0));
-  const priveNetto       = priveVermogen - vrh + eigenWoningNetto;
+  // ── Stap 4: privé netto (uitsluitend liquide vermogen) ────────────────────
+  const vrh           = box3Heffing(priveSpaar, priveBeleg, p);
+  const priveVermogen = priveSpaar + priveBeleg;
+  const priveNetto    = priveVermogen - vrh;   // eigenWoning bewust NIET opgeteld
 
-  // ── Stap 5: netto besteedbaar vandaag ──────────────────────────────────────
+  // ── Stap 5: netto besteedbaar vandaag ─────────────────────────────────────
   const nettoBesteedbaar = bvNaVpb - latenteBox2 + priveNetto;
+
+  // ── Apart: niet-liquide vermogen (overwaarde eigen woning) ────────────────
+  // Geen term in nettoBesteedbaar. Getoond als losse categorie in de UI.
+  // Verzilvering (verkleinen/herfinancieren) is een toekomstige scenario-hefboom.
+  const eigenWoningNetto   = Math.max(0, (wozWaarde ?? 0) - (hypotheekRestschuld ?? 0));
+  const nietLiquideVermogen = eigenWoningNetto;
 
   return {
     bvBruto,
@@ -366,9 +378,9 @@ export function berekenNettoBesteedbaar({
     box2InHoog,
     priveVermogen,
     vrh,
-    eigenWoningNetto,
     priveNetto,
     nettoBesteedbaar,
+    nietLiquideVermogen,   // apart — niet in hero-getal
   };
 }
 

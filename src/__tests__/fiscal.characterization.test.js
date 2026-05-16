@@ -540,13 +540,14 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     //   belastbaarRendement = 12.000 × 0,703215 = 8.438,58
     //   vrh = 8.438,58 × 0,36 = 3.037,8888 → 3.038
     //
-    // Stap 4 — privé netto:
-    //   priveVermogen   = 0 + 200.000 = 200.000
-    //   eigenWoningNetto = max(0, 0 − 0) = 0
-    //   priveNetto       = 200.000 − 3.037,8888 + 0 = 196.962,1112 → 196.962
+    // Stap 4 — privé netto (eigenWoning NIET opgeteld — spec-correctie):
+    //   priveVermogen         = 0 + 200.000 = 200.000
+    //   priveNetto            = 200.000 − 3.037,8888 = 196.962,1112 → 196.962
+    //   eigenWoningNetto      = max(0, 0 − 0) = 0  → `nietLiquideVermogen` = 0
     //
     // Stap 5 — netto besteedbaar:
     //   481.000 − 144.635,205 + 196.962,1112 = 533.326,9062 → 533.327
+    // (getal ongewijzigd t.o.v. oude spec omdat eigenWoning hier 0 is)
     const result = berekenNettoBesteedbaar({
       bvBruto: 500000, ongerealiseerdeWinstBV: 100000,
       priveSpaar: 0, priveBeleg: 200000,
@@ -557,7 +558,7 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     expect(Math.round(result.bvNaVpb)).toBe(481000);
     expect(Math.round(result.latenteBox2)).toBe(144635);
     expect(Math.round(result.vrh)).toBe(3038);
-    expect(Math.round(result.eigenWoningNetto)).toBe(0);
+    expect(Math.round(result.nietLiquideVermogen)).toBe(0);   // veldnaam gecorrigeerd
     expect(Math.round(result.priveNetto)).toBe(196962);
     expect(Math.round(result.nettoBesteedbaar)).toBe(533327);
   });
@@ -637,7 +638,13 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     expect(delta).toBe(61824);
   });
 
-  it('(c) Eigen woning telt mee in privé netto', () => {
+  it('(c) Eigen woning apart als nietLiquideVermogen — niet in hero-getal', () => {
+    // Karakterisatie-delta: nettoBesteedbaar was 783.327 → nu 533.327 (−250.000).
+    // Oorzaak: spec-fout §5.2 gecorrigeerd — eigenWoningNetto telde mee in nettoBesteedbaar;
+    //   formule telde niet-liquide overwaarde op bij "netto besteedbaar als ik nu stop".
+    //   Fout zat in de originele spec-formule (architect), niet in de implementatie.
+    //   eigenWoningNetto is nu een apart veld `nietLiquideVermogen` in het resultaatobject.
+    //
     // Nullijn (zie describe I): vpbGrens=200K (r.35), vpbTariefLaag=19% (r.28),
     //   box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51), tariefHoog=31% (r.65),
     //   hvv=59.357 (r.94), forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87); peildatum 2026
@@ -649,21 +656,25 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     // Stap 1 — latente VPB: identiek aan test (a) → latenteVpb=19.000, bvNaVpb=481.000
     // Stap 2 — latente box 2: identiek aan test (a) → latenteBox2=144.635
     // Stap 3 — VRH: identiek aan test (a) → vrh=3.038
-    // Stap 4 — privé netto (verschilt van test a):
-    //   eigenWoningNetto = max(0, 400.000 − 150.000) = 250.000
-    //   priveNetto       = 200.000 − 3.037,889 + 250.000 = 446.962,111 → 446.962
+    // Stap 4 — privé netto (NIEUWE formule, eigenWoning NIET opgeteld):
+    //   priveNetto = 200.000 − 3.037,889 = 196.962,111 → 196.962
+    //   (identiek aan test a — privé-invoer ongewijzigd)
     // Stap 5 — netto besteedbaar:
-    //   481.000 − 144.635,205 + 446.962,111 = 783.326,906 → 783.327
-    //   (= test a + 250.000 eigen woning, als sanity-check)
+    //   481.000 − 144.635,205 + 196.962,111 = 533.326,906 → 533.327
+    //   (identiek aan test a — sanity-check: eigenWoning heeft geen invloed meer)
+    // Apart — niet-liquide vermogen:
+    //   max(0, 400.000 − 150.000) = 250.000 → teruggegevens als `nietLiquideVermogen`
     const result = berekenNettoBesteedbaar({
       bvBruto: 500000, ongerealiseerdeWinstBV: 100000,
       priveSpaar: 0, priveBeleg: 200000,
       wozWaarde: 400000, hypotheekRestschuld: 150000,
       p: WATERFALL_P,
     });
-    expect(Math.round(result.eigenWoningNetto)).toBe(250000);
-    expect(Math.round(result.priveNetto)).toBe(446962);
-    expect(Math.round(result.nettoBesteedbaar)).toBe(783327);
+    // Hero-getal: eigenWoning niet opgeteld
+    expect(Math.round(result.priveNetto)).toBe(196962);            // identiek aan test (a)
+    expect(Math.round(result.nettoBesteedbaar)).toBe(533327);      // identiek aan test (a)
+    // Niet-liquide vermogen: apart, correct berekend
+    expect(Math.round(result.nietLiquideVermogen)).toBe(250000);
   });
 
 });

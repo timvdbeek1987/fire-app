@@ -118,3 +118,27 @@ schakelbare aanname, geen voorspelling." Dit dekt de onzekerheid richting de geb
 Vermoedelijk moet de grondslag worden aangepast (forfait vervalt, werkelijk rendement is de volledige
 grondslag, hvv-aftrek kan anders uitwerken). Toets dan: heeft `box3VrhJaar` een apart `grondslag`-pad
 nodig, of volstaat een parameter-update?
+
+---
+
+## TS-07 · Verzilvering eigenwoning-overwaarde als expliciete scenario-hefboom
+
+**Status:** open (bewuste modelkeuze)  
+**Prioriteit:** laag — gerelateerd aan scenario-infrastructuur die nog niet bestaat  
+**Locatie:** `src/data.js` — `berekenNettoBesteedbaar()` resultaatobject (`nietLiquideVermogen`);
+`src/views/Dashboard.jsx` — niet-liquide vermogen sectie
+
+Eigenwoning-overwaarde (WOZ − hypotheek) wordt nu bewust buiten het hero-getal
+"netto besteedbaar vandaag" gehouden en apart weergegeven als `nietLiquideVermogen`.
+Dit is gecorrigeerd in de spec (§5.2) en implementatie — zie commit bericht voor
+de foutlokalisatie (spec-fout, niet implementatiefout).
+
+Verzilvering van de overwaarde via verkleinen of herfinancieren is een reële
+FIRE-hefboom voor veel DGA's, maar vereist:
+1. Scenario-modellering (aflossingsvrij herfinancieren vs. annuïtair verkleinen)
+2. Fiscale behandeling van de vrijgekomen liquiditeit (box 3-impact)
+3. UI-workflow voor de scenariovergelijking
+
+**Oplossing:** Bouwen als expliciete scenario-hefboom wanneer de scenario-infrastructuur
+beschikbaar is. Analoog aan de 2028-schakelaar: schakelbare aanname met onzekerheids-
+label, niet als stille term in het hero-getal.

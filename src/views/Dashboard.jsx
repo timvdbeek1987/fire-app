@@ -416,17 +416,16 @@ export default function Dashboard({
               label:  'Privé netto',
               bedrag: waterfall.priveNetto,
               kleur:  waterfall.priveNetto >= 0 ? 'var(--green)' : 'var(--red)',
-              sub:    `vermogen ${fmt(waterfall.priveVermogen)} − VRH ${fmt(Math.round(waterfall.vrh))}${waterfall.eigenWoningNetto > 0 ? ` + woning ${fmt(Math.round(waterfall.eigenWoningNetto))}` : ''}`,
+              sub:    `vermogen ${fmt(waterfall.priveVermogen)} − VRH ${fmt(Math.round(waterfall.vrh))}`,
               detail: (
                 <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
                   <div>Privévermogen (box 3): {fmt(waterfall.priveVermogen)}</div>
                   <div>VRH (box 3-heffing, jaarlijks): − {fmt(Math.round(waterfall.vrh))} · forfaitair stelsel 2026</div>
-                  {waterfall.eigenWoningNetto > 0
-                    ? <div>Eigen woning (WOZ − hypotheek): + {fmt(Math.round(waterfall.eigenWoningNetto))}</div>
-                    : <div style={{ color: 'var(--text-4)' }}>Eigen woning: niet ingevoerd (instelbaar via Instellingen)</div>
-                  }
                   <div style={{ marginTop: '0.3rem', fontWeight: 600, color: 'var(--text)' }}>
                     Privé netto = {fmt(Math.round(waterfall.priveNetto))}
+                  </div>
+                  <div style={{ marginTop: '0.2rem', color: 'var(--text-4)' }}>
+                    Eigen woning — zie &#34;Niet-liquide vermogen&#34; hieronder (niet opgeteld bij besteedbaar)
                   </div>
                 </div>
               ),
@@ -463,6 +462,28 @@ export default function Dashboard({
               {fmt(Math.round(waterfall.nettoBesteedbaar))}
             </div>
           </div>
+
+          {/* Niet-liquide vermogen — eigen woning (apart, niet in hero-getal) */}
+          {waterfall.nietLiquideVermogen > 0 && (
+            <div style={{ marginTop: '0.85rem', padding: '0.6rem 0.8rem', background: 'rgba(99,102,241,0.05)', borderRadius: 'var(--r)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', fontWeight: 500, color: 'var(--text)' }}>
+                    Niet-liquide vermogen — eigen woning
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-3)', marginTop: '0.05rem' }}>
+                    WOZ − hypotheek · niet opgeteld bij netto besteedbaar
+                  </div>
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 600, color: 'rgba(99,102,241,0.9)', flexShrink: 0 }}>
+                  {fmt(Math.round(waterfall.nietLiquideVermogen))}
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-4)', marginTop: '0.35rem', lineHeight: 1.55 }}>
+                Verzilvering (verkleinen / herfinancieren) is een toekomstige scenario-hefboom — bewust buiten het besteedbare getal gehouden.
+              </div>
+            </div>
+          )}
 
         </div>
       )}

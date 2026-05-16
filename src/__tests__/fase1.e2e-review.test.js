@@ -100,13 +100,20 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     //   14.600.292,096 / 600.000 = 24.333,820
     //   VRH = 24.333,820 × 0,36 = 8.760,175 → 8.760
     //
-    // ── Stap 4 — privé netto ─────────────────────────────────────────────────
+    // ── Stap 4 — privé netto (eigenWoning NIET opgeteld — spec-correctie) ────
+    // Karakterisatie-delta: priveNetto was 1.091.240 → nu 591.240 (−500.000 eigenWoning).
+    // Nullijn: hvv=59.357 (r.94), box3Tarief=36% (r.87); peildatum 2026
     //   priveVermogen    = 600.000
+    //   priveNetto       = 600.000 − 8.760,175 = 591.239,825 → 591.240
     //   eigenWoningNetto = max(0, 750.000 − 250.000) = 500.000
-    //   priveNetto       = 600.000 − 8.760,175 + 500.000 = 1.091.239,825 → 1.091.240
+    //                      → apart als `nietLiquideVermogen`, niet in priveNetto
     //
     // ── Stap 5 — netto besteedbaar ────────────────────────────────────────────
-    //   1.384.600 − 420.276,41 + 1.091.239,825 = 2.055.563,415 → 2.055.563
+    // Karakterisatie-delta: nettoBesteedbaar was 2.055.563 → nu 1.555.563 (−500.000 eigenWoning).
+    //   1.384.600 − 420.276,41 + 591.239,825 = 1.555.563,415 → 1.555.563
+    //
+    // ── Apart — niet-liquide vermogen ─────────────────────────────────────────
+    //   nietLiquideVermogen = 500.000 (apart veld — niet in hero-getal)
 
     const r = berekenNettoBesteedbaar({ ...PROFIEL, p: P_BASIS });
 
@@ -121,13 +128,16 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
 
     // Box 3-as: gewogen forfait, hvv verdubbeld
     expect(Math.round(r.vrh)).toBe(8760);
+    expect(Math.round(r.priveNetto)).toBe(591240);   // eigenWoning niet meegeteld
 
-    // Eigen woning
-    expect(Math.round(r.eigenWoningNetto)).toBe(500000);
-    expect(Math.round(r.priveNetto)).toBe(1091240);
+    // Hero-getal (liquide vermogen only)
+    expect(Math.round(r.nettoBesteedbaar)).toBe(1555563);
 
-    // Hero-getal
-    expect(Math.round(r.nettoBesteedbaar)).toBe(2055563);
+    // Niet-liquide vermogen: apart veld, correct berekend, NIET in hero-getal
+    expect(Math.round(r.nietLiquideVermogen)).toBe(500000);
+    expect(r.nettoBesteedbaar + r.nietLiquideVermogen).not.toBeCloseTo(
+      Math.round(r.nettoBesteedbaar), 0
+    ); // bevestigt dat de twee getallen niet stiekem zijn opgeteld
   });
 
   it('(b) Partnerdrempel-check: elke as precies 1× verdubbeld', () => {
@@ -257,7 +267,8 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     expect(schakelaarAan.latenteBox2).toBe(schakelaarUit.latenteBox2);
     expect(schakelaarAan.priveNetto).toBe(schakelaarUit.priveNetto);
     expect(schakelaarAan.nettoBesteedbaar).toBe(schakelaarUit.nettoBesteedbaar);
-    expect(Math.round(schakelaarAan.nettoBesteedbaar)).toBe(2055563);
+    // Karakterisatie-delta: was 2.055.563 → nu 1.555.563 (eigenWoning niet in hero-getal)
+    expect(Math.round(schakelaarAan.nettoBesteedbaar)).toBe(1555563);
   });
 
   it('(e) 2028-grensoverschrijding: box3VrhJaar vóór/ná 2028, schakelaar aan/uit', () => {
@@ -322,6 +333,60 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     // box3VrhJaar delegeert identiek naar box3Heffing wanneer schakelaar uit of jaar < 2028
     expect(box3VrhJaar(spaar, beleg, 2027, P_4)).toBe(box3Heffing(spaar, beleg, P_4));
     expect(box3VrhJaar(spaar, beleg, 2028, P_BASIS)).toBe(box3Heffing(spaar, beleg, P_BASIS));
+  });
+
+  it('(f) Ontmaskerend — grote overwaarde, klein liquide vermogen: hero-getal is klein, woning apart', () => {
+    // Doel: elke regressie die eigenWoning terugzet in nettoBesteedbaar geeft onmiddellijk
+    //       een rode test. Het hero-getal moet uitsluitend het liquide vermogen reflecteren.
+    //
+    // Nullijn: vpbGrens=200K (r.35), box2Grens=68.843 (r.58), hvv=59.357 (r.94),
+    //          forfaitSpaar=1,28% (r.109), forfaitBeleg=6,0% (r.101),
+    //          box3Tarief=36% (r.87); peildatum 2026
+    //
+    // Profiel "OverwaardeHeavy":
+    //   bvBruto                = 0        (geen BV — puur privé-gebruiker of DGA zonder BV)
+    //   ongerealiseerdeWinstBV = 0
+    //   priveSpaar             = 5.000
+    //   priveBeleg             = 10.000   → totaal privé = 15.000 (klein liquide)
+    //   wozWaarde              = 800.000
+    //   hypotheekRestschuld    = 100.000  → overwaarde = 700.000 (groot niet-liquide)
+    //   fiscaalPartner         = false
+    //
+    // Handberekening:
+    //   Stap 1 — latente VPB: 0 (ongerealiseerdeWinstBV=0)
+    //   Stap 2 — bvNaVpb = 0 − 0 = 0
+    //   Stap 3 — latente box 2: bvNaVpb=0 ≤ box2Grens=68.843
+    //            → box2InLaag=0, box2InHoog=0, latenteBox2=0
+    //   Stap 4 — VRH: totaal=15.000 < hvv=59.357 → rendementsgrondslag=0 → vrh=0
+    //            priveNetto = 15.000 − 0 = 15.000
+    //   Stap 5 — nettoBesteedbaar = 0 − 0 + 15.000 = 15.000   ← klein liquide
+    //   Apart  — eigenWoningNetto = max(0, 800.000−100.000) = 700.000
+    //            nietLiquideVermogen = 700.000                ← groot, maar apart
+    //
+    //   Bug-scenario (als eigenWoning wél in hero-getal zat): 15.000 + 700.000 = 715.000
+    //   → de .not.toBe(715000)-assertion maakt elke regressie onmiddellijk zichtbaar.
+
+    const P_GEEN_BV = { ...BASE_PARAMS, fiscaalPartner: false };
+    const r = berekenNettoBesteedbaar({
+      bvBruto: 0, ongerealiseerdeWinstBV: 0,
+      priveSpaar: 5000, priveBeleg: 10000,
+      wozWaarde: 800000, hypotheekRestschuld: 100000,
+      p: P_GEEN_BV,
+    });
+
+    // Hero-getal: uitsluitend liquide vermogen
+    expect(Math.round(r.nettoBesteedbaar)).toBe(15000);
+
+    // Niet-liquide vermogen: groot en correct
+    expect(Math.round(r.nietLiquideVermogen)).toBe(700000);
+
+    // Regressiecheck: eigenWoning niet stiekem opgeteld
+    expect(Math.round(r.nettoBesteedbaar)).not.toBe(715000);   // 15K + 700K (bug)
+    expect(Math.round(r.nettoBesteedbaar)).not.toBe(700000);   // enkel eigenWoning (bug)
+
+    // VRH = 0: privé-totaal 15K < hvv=59.357 (r.94, fiscaalPartner=false)
+    expect(r.vrh).toBe(0);
+    expect(r.latenteBox2).toBe(0);
   });
 
 });
