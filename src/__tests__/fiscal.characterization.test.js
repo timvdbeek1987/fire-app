@@ -13,6 +13,7 @@ import {
   runMonteCarlo,
   berekenVereistKapitaalAnalytisch,
   berekenMaandelijksOnttrektbaar,
+  bruterDividendBox2,
   BASE_PARAMS,
 } from '../data.js';
 
@@ -65,17 +66,20 @@ describe('A. VPB-berekening rond de tariefbreuk', () => {
 
   it('BV=500K — bvP50 na eerste jaar klopt met VPB-aftrek', () => {
     const mc = runMonteCarlo(DGA_BASE, START_PENSIOEN_500K, 1);
-    expect(mc.years[0].bvP50).toBe(411009);
+    // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 411009 → 405482
+    expect(mc.years[0].bvP50).toBe(405482);
   });
 
   it('BV=1M — bvP50 na eerste jaar klopt met VPB-aftrek', () => {
     const mc = runMonteCarlo(DGA_BASE, START_PENSIOEN_1M, 1);
-    expect(mc.years[0].bvP50).toBe(995575);
+    // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 995575 → 990129
+    expect(mc.years[0].bvP50).toBe(990129);
   });
 
   it('BV=3M — bvP50 na eerste jaar klopt met VPB-aftrek', () => {
     const mc = runMonteCarlo(DGA_BASE, START_PENSIOEN_3M, 1);
-    expect(mc.years[0].bvP50).toBe(3292644);
+    // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 3292644 → 3287181
+    expect(mc.years[0].bvP50).toBe(3287181);
   });
 
 });
@@ -96,8 +100,9 @@ describe('B. Dividend-bruttering (indirect via nettoInkomenEngine)', () => {
     const mc = runMonteCarlo(DGA_BASE, START_PENSIOEN_1M, 1);
     const rij = mc.medianPath?.[0];
     expect(rij.brutoDividend).toBeGreaterThan(0);
-    // divBelBedrag = brutoDividend × dividendbelasting (24.5%)
-    expect(rij.divBelBedrag).toBe(Math.round(rij.brutoDividend * 0.245));
+    // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843).
+    // divBelBedrag = divResult.belasting (getrapte berekening via bruterDividendBox2). Delta: 32365 → 36476
+    expect(rij.divBelBedrag).toBe(36476);
   });
 
   it('DGA: ibBedrag = brutoDGA × inkomstenbelasting (43%)', () => {
@@ -161,16 +166,18 @@ describe('D. runMonteCarlo deterministisch (zelfde seed bij zelfde params)', () 
     expect(run.kansSucces).toBe(100);
   });
 
-  it('bvP50 op leeftijd 60 = 471801 (snapshot)', () => {
+  it('bvP50 op leeftijd 60 = 430892 (snapshot)', () => {
     const run = runMonteCarlo(PARAMS_D, START_D, 2500);
     const r60 = run.years.find(r => r.leeftijd === 60);
-    expect(r60?.bvP50).toBe(471801);
+    // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 471801 → 430892
+    expect(r60?.bvP50).toBe(430892);
   });
 
-  it('totaalP50 op leeftijd 60 = 579497 (snapshot)', () => {
+  it('totaalP50 op leeftijd 60 = 538807 (snapshot)', () => {
     const run = runMonteCarlo(PARAMS_D, START_D, 2500);
     const r60 = run.years.find(r => r.leeftijd === 60);
-    expect(r60?.totaalP50).toBe(579497);
+    // BUGFIX 1b: box 2 was flat 24.5%, nu tiered (24.5%/31% met drempel €68.843). Delta: 579497 → 538807
+    expect(r60?.totaalP50).toBe(538807);
   });
 
 });
@@ -221,6 +228,47 @@ describe('F. berekenMaandelijksOnttrektbaar', () => {
 
   it('Portfolio 0 geeft 0 terug', () => {
     expect(berekenMaandelijksOnttrektbaar(BASE_PARAMS, 0, 10)).toBe(0);
+  });
+
+});
+
+// ─── G. Getrapte box 2-brutering (bruterDividendBox2) ───────────────────────
+
+describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
+
+  it('Volledig in lage schijf (nettoNodig < €68.843 × 0.755): bruto = netto / 0.755', () => {
+    // €50.000 netto, geen fiscaal partner
+    // Laag schijf max netto: 68843 × (1-0.245) = 51.975,65
+    // €50.000 < €51.975 → volledig laag schijf
+    // Verwacht bruto: 50000 / 0.755 = 66.225,17 → afgerond
+    const r = bruterDividendBox2(50000, { ...BASE_PARAMS });
+    expect(Math.round(r.bruto)).toBe(66225);
+    expect(r.inHoogSchijf).toBe(0);
+  });
+
+  it('Deels hoge schijf (nettoNodig > €51.975): split over twee schijven', () => {
+    // €80.000 netto, geen fiscaal partner
+    // Lage schijf: 68843 bruto → 68843 × 0.755 = 51.975,47 netto
+    // Rest: 80000 - 51975 = 28025 netto via hoge schijf → 28025 / 0.69 = 40.615 bruto
+    // Totaal bruto ≈ 68843 + 40615 = 109.458
+    const r = bruterDividendBox2(80000, { ...BASE_PARAMS });
+    expect(Math.round(r.bruto)).toBeGreaterThan(109000);
+    expect(r.inHoogSchijf).toBeGreaterThan(0);
+    // Belasting = bruto - netto
+    expect(Math.round(r.belasting)).toBe(Math.round(r.bruto) - 80000);
+  });
+
+  it('Drempel verdubbelt bij fiscaal partner', () => {
+    const zonder = bruterDividendBox2(100000, { ...BASE_PARAMS, fiscaalPartner: false });
+    const met    = bruterDividendBox2(100000, { ...BASE_PARAMS, fiscaalPartner: true  });
+    // Met partner: drempel 2×68843 = 137686 → meer in lage schijf → lagere totaalbelasting
+    expect(met.belasting).toBeLessThan(zonder.belasting);
+  });
+
+  it('nettoNodig = 0 geeft bruto = 0', () => {
+    const r = bruterDividendBox2(0, { ...BASE_PARAMS });
+    expect(r.bruto).toBe(0);
+    expect(r.belasting).toBe(0);
   });
 
 });

@@ -91,7 +91,8 @@ export const BASE_PARAMS = {
   vermogensrendementsheffing: _fp.vermogensrendementsheffing,
   // Inkomstenbelasting (globale effectieve tarieven — pas aan op eigen situatie)
   inkomstenbelasting:         _fp.inkomstenbelasting,
-  // Dividendbelasting (= box 2 laag tarief — alias voor achterwaartse compatibiliteit)
+  // DEPRECATED alias — engine gebruikt nu box2TariefLaag/Hoog/Grens via bruterDividendBox2.
+  // Behouden voor achterwaartse compatibiliteit (paramsToSeed hash + opgeslagen gebruikersinstellingen).
   dividendbelasting:          _fp.box2TariefLaag,
   // Vennootschapsbelasting (achterwaartse compatibiliteit — alias voor vpbTariefLaag)
   vennootschapsbelasting:     _fp.vpbTariefLaag,
@@ -211,6 +212,51 @@ function vereist(p, sleutel) {
   return p[sleutel];
 }
 
+/**
+ * Berekent het bruto dividend dat een BV moet uitkeren om 'nettoNodig' netto te leveren,
+ * rekening houdend met het getrapte box 2-tarief.
+ *
+ * Drempel verdubbelt bij fiscaal partner (p.fiscaalPartner === true).
+ * Leest uitsluitend uit de geversioneerde params — geen interne fallback-constanten.
+ *
+ * @param {number} nettoNodig  Benodigd netto bedrag na box 2-heffing (jaarlijks)
+ * @param {object} p           Params-object (moet box2TariefLaag/Hoog/Grens bevatten)
+ * @returns {{ bruto: number, belasting: number, inLaagSchijf: number, inHoogSchijf: number }}
+ */
+export function bruterDividendBox2(nettoNodig, p) {
+  if (nettoNodig <= 0) return { bruto: 0, belasting: 0, inLaagSchijf: 0, inHoogSchijf: 0 };
+
+  const grens      = vereist(p, 'box2Grens') * (p.fiscaalPartner ? 2 : 1);
+  const tariefLaag = vereist(p, 'box2TariefLaag');
+  const tariefHoog = vereist(p, 'box2TariefHoog');
+
+  // Maximaal netto uit de lage schijf
+  const nettoMaxLaag = grens * (1 - tariefLaag);
+
+  if (nettoNodig <= nettoMaxLaag) {
+    // Volledig binnen lage schijf
+    const bruto = nettoNodig / (1 - tariefLaag);
+    return {
+      bruto,
+      belasting:    bruto - nettoNodig,
+      inLaagSchijf: bruto,
+      inHoogSchijf: 0,
+    };
+  }
+
+  // Deels lage schijf, deels hoge schijf
+  const brutoLaag = grens;
+  const nettoLaag = grens * (1 - tariefLaag);
+  const brutoHoog = (nettoNodig - nettoLaag) / (1 - tariefHoog);
+
+  return {
+    bruto:        brutoLaag + brutoHoog,
+    belasting:    brutoLaag + brutoHoog - nettoNodig,
+    inLaagSchijf: brutoLaag,
+    inHoogSchijf: brutoHoog,
+  };
+}
+
 function runSinglePath(p, start, so, randNorm, strategie = null) {
   const birthYear = p.geboortejaar ?? BIRTH_YEAR;
 
@@ -312,7 +358,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const aflosMethodeOp = p.hypotheekAflosMethode ?? 'bank';
       let eenmaligAflosOp  = 0;
       if (aflosMethodeOp === 'bv' && jaar === aflosJaarOp) {
-        eenmaligAflosOp = (p.hypotheekRestschuld ?? 150000) / (1 - p.dividendbelasting);
+        const aflosResult = bruterDividendBox2(p.hypotheekRestschuld ?? 150000, p);
+        eenmaligAflosOp = aflosResult.bruto;
       }
 
       bvBeleg = Math.max(0, bvBeleg + inBV + rendBelegBVn - eenmaligAflosOp);
@@ -376,7 +423,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
 
       let eenmaligAflos = 0;
       if (aflosMethode === 'bv' && jaar === aflosJaar) {
-        eenmaligAflos = (p.hypotheekRestschuld ?? 150000) / (1 - p.dividendbelasting);
+        const aflosResultP = bruterDividendBox2(p.hypotheekRestschuld ?? 150000, p);
+        eenmaligAflos = aflosResultP.bruto;
       }
 
       const hypotheekAfgelost = (aflosMethode === 'bv'   && jaar >  aflosJaar)
@@ -450,10 +498,11 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const behoefteNaPrive = Math.max(0, behoefteNaExtern - ontPv);
       const nettoDGA    = brutoDGAjaar * (1 - p.inkomstenbelasting);
       const behoefteNaDGA = Math.max(0, behoefteNaPrive - nettoDGA);
-      const brutoDividend = behoefteNaDGA > 0 ? behoefteNaDGA / (1 - p.dividendbelasting) : 0;
+      const divResult     = bruterDividendBox2(behoefteNaDGA, p);
+      const brutoDividend = divResult.bruto;
       const ontBV = brutoDGAjaar + brutoDividend + eenmaligAflos;
 
-      const nettoDividend  = brutoDividend * (1 - p.dividendbelasting);
+      const nettoDividend  = behoefteNaDGA;  // nettoNodig IS het netto dividend — geen herberekening nodig
       const nettoUitBV     = nettoDGA + nettoDividend;
       const nettoInkomen   = nettoUitBV + ontPv + inkSPMS + inkAOW;
 
@@ -500,7 +549,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
         brutoDGA:         Math.round(brutoDGAjaar),
         ibBedrag:         Math.round(brutoDGAjaar * p.inkomstenbelasting),
         brutoDividend:    Math.round(brutoDividend),
-        divBelBedrag:     Math.round(brutoDividend * p.dividendbelasting),
+        divBelBedrag:     Math.round(divResult.belasting),
         vpbBedrag:        Math.round(vpb),
         inkSPMS:          Math.round(inkSPMS),
         inkAOW:           Math.round(inkAOW),
@@ -935,7 +984,7 @@ export function berekenMaandelijksOnttrektbaar(params, portfolioNominaalPensioen
   const nMaanden = Math.max(12, (uitputtingLft - pensioenLft) * 12);
 
   const rNominaalJaar = p.rendementNaPensioen ?? 0.05;
-  const vrh           = p.vermogensrendementsheffing ?? 0.02088;
+  const vrh           = vereist(p, 'vermogensrendementsheffing');
   const inflatie      = p.inflatieGemiddeld ?? 0.02;
 
   const cumulInflatie  = Math.pow(1 + inflatie, Math.max(0, jaarTotPensioen));

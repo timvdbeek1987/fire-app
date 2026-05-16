@@ -113,7 +113,7 @@ export default function Onttrekking({
   // Real net annual return after VRH and inflation
   const rNettoJaar = useMemo(() => {
     const rNom = params.rendementNaPensioen        ?? 0.05;
-    const vrh  = params.vermogensrendementsheffing ?? 0.02088;
+    const vrh  = params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing;
     const inf  = params.inflatieGemiddeld          ?? 0.02;
     return (1 + rNom - vrh) / (1 + inf) - 1;
   }, [params]);
@@ -391,7 +391,7 @@ export default function Onttrekking({
         </div>
 
         <div style={{ marginTop: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.63rem', color: 'var(--text-4)', lineHeight: 1.7 }}>
-          Reëel = huidig koopkrachtniveau · nominaal rendement na pensioen {((params.rendementNaPensioen ?? 0.05) * 100).toFixed(1)}% · VRH {((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(2)}% · inflatie {((params.inflatieGemiddeld ?? 0.02) * 100).toFixed(1)}% · reëel netto {(rNettoJaar * 100).toFixed(2)}%
+          Reëel = huidig koopkrachtniveau · nominaal rendement na pensioen {((params.rendementNaPensioen ?? 0.05) * 100).toFixed(1)}% · VRH {((params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing) * 100).toFixed(2)}% · inflatie {((params.inflatieGemiddeld ?? 0.02) * 100).toFixed(1)}% · reëel netto {(rNettoJaar * 100).toFixed(2)}%
         </div>
       </div>
     </div>

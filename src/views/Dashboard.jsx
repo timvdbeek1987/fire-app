@@ -68,7 +68,7 @@ export default function Dashboard({
     const portfolio = isPrive ? priveOpPensioendag : totaalOpPensioendag;
     if (!portfolio || !nominaalVastBedrag) return uitputtingLftMO - pensioenLeeftijdMO;
     const rNom = params.rendementNaPensioen ?? BASE_PARAMS.rendementNaPensioen ?? 0.05;
-    const vrh  = params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing ?? 0.02088;
+    const vrh  = params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing;
     const rM = Math.pow(1 + Math.max(-0.5, rNom - vrh), 1 / 12) - 1;
     let n;
     if (Math.abs(rM) < 0.000001) {
@@ -429,8 +429,8 @@ export default function Dashboard({
               {/* Belastingnoot */}
               <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
                 {isPrive
-                  ? <>💡 <b>Belastingen:</b> VRH (box 3, ~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Onttrekkingen uit privévermogen zijn zelf belastingvrij.</>
-                  : <>💡 <b>Belastingen:</b> VRH (~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Dividendbelasting (~{((params.dividendbelasting ?? 0.245) * 100).toFixed(0)}%) op BV-uitkeringen is <b>nog niet verwerkt</b> — het werkelijke netto besteedbare bedrag ligt lager.</>
+                  ? <>💡 <b>Belastingen:</b> VRH (box 3, ~{((params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Onttrekkingen uit privévermogen zijn zelf belastingvrij.</>
+                  : <>💡 <b>Belastingen:</b> VRH (~{((params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Box 2-heffing (onttrekking via dividend uit BV) is verwerkt in de projectie via de bruteringsfunctie.</>
                 }
               </div>
             </div>
