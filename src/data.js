@@ -91,8 +91,8 @@ export const BASE_PARAMS = {
   vermogensrendementsheffing: _fp.vermogensrendementsheffing,
   // Inkomstenbelasting (globale effectieve tarieven — pas aan op eigen situatie)
   inkomstenbelasting:         _fp.inkomstenbelasting,
-  // DEPRECATED alias — engine gebruikt nu box2TariefLaag/Hoog/Grens via bruterDividendBox2.
-  // Behouden voor achterwaartse compatibiliteit (paramsToSeed hash + opgeslagen gebruikersinstellingen).
+  // DEPRECATED ALIAS — uitsluitend als hash-anker in paramsToSeed (seed-stabiliteit voor nSims=1 tests).
+  // Niet gebruiken als berekeningsinput. Verwijderen zodra D-tests naar nSims≥100 gemigreerd zijn.
   dividendbelasting:          _fp.box2TariefLaag,
   // Vennootschapsbelasting (achterwaartse compatibiliteit — alias voor vpbTariefLaag)
   vennootschapsbelasting:     _fp.vpbTariefLaag,
@@ -186,7 +186,7 @@ function paramsToSeed(params, start) {
     nettoInkomenDoel: params.nettoInkomenDoel,
     inlegJaarlijksBV: params.inlegJaarlijksBV,
     inlegJaarlijksPrive: params.inlegJaarlijksPrive,
-    dividendbelasting: params.dividendbelasting,
+    dividendbelasting: params.dividendbelasting,  // hash-anker — zie BASE_PARAMS toelichting
     vennootschapsbelasting: params.vennootschapsbelasting,
     hypotheekAflosMethode: params.hypotheekAflosMethode,
     hypotheekAflosJaar: params.hypotheekAflosJaar,
@@ -358,7 +358,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const aflosMethodeOp = p.hypotheekAflosMethode ?? 'bank';
       let eenmaligAflosOp  = 0;
       if (aflosMethodeOp === 'bv' && jaar === aflosJaarOp) {
-        const aflosResult = bruterDividendBox2(p.hypotheekRestschuld ?? 150000, p);
+        const aflosResult = bruterDividendBox2(p.hypotheekRestschuld, p);  // default=150000 via BASE_PARAMS
         eenmaligAflosOp = aflosResult.bruto;
       }
 
@@ -415,7 +415,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const herfinRentePct = (p.hypotheekHerfinRente ?? 4.5) / 100;
       const herfinR  = herfinRentePct / 12;
       const herfinN  = Math.max(1, (eindHypoJaar - aflosJaar) * 12);
-      const herfinS  = p.hypotheekRestschuld ?? 150000;
+      const herfinS  = p.hypotheekRestschuld;  // default=150000 via BASE_PARAMS
       const maandNa  = herfinR > 0
         ? herfinS * herfinR * Math.pow(1 + herfinR, herfinN) / (Math.pow(1 + herfinR, herfinN) - 1)
         : herfinS / herfinN;
@@ -423,7 +423,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
 
       let eenmaligAflos = 0;
       if (aflosMethode === 'bv' && jaar === aflosJaar) {
-        const aflosResultP = bruterDividendBox2(p.hypotheekRestschuld ?? 150000, p);
+        const aflosResultP = bruterDividendBox2(p.hypotheekRestschuld, p);  // default=150000 via BASE_PARAMS
         eenmaligAflos = aflosResultP.bruto;
       }
 

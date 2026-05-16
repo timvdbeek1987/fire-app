@@ -275,4 +275,41 @@ describe('G. Getrapte box 2-brutering (bruterDividendBox2)', () => {
     expect(r.belasting).toBe(0);
   });
 
+  // ── 2026-nullijn benchmark (§ G5/G6) ──────────────────────────────────────
+  // Gebaseerd op geverifieerde params: box2Grens=68.843, tariefLaag=24,5%, tariefHoog=31%.
+  // Eerdere benchmark (€107.022 / €29.622) was berekend met grens=67.000 + tariefHoog=33%
+  // — een parametercombinatie die nooit in de codebase heeft gezeten; vervalt.
+  //
+  // Gecorrigeerde bugomvang voor dit profiel (netto €77.400/j, geen partner):
+  //   Nieuwe belasting (tiered)   : €28.289
+  //   Oude belasting (flat 24,5%) : €25.117  (= bruto €102.517 × 24,5%)
+  //   Onderschatting onder oud stelsel: €28.289 − €25.117 = €3.172/jaar
+  //   (Eerder genoemde €4.505 was met verouderde 67k/33%-params en vervalt.)
+
+  it('2026-benchmark — netto €77.400 geen partner: bruto=105.689, belasting=28.289 (split schijven)', () => {
+    // behoefteNaDGA in een comfort-DGA-profiel (nettoInkomenDoel=90k, DGAsalaris=20k na IB=43%):
+    //   nettoDGA = 20000 × 0.57 = 11400
+    //   behoefteNaDGA ≈ 90000 - 11400 - 1200 (ontPv) = ~77400
+    // Lage schijf max netto: 68843 × 0.755 = 51.976  →  77.400 > 51.976 → split
+    // brutoLaag = 68.843; brutoHoog = (77400 - 51976) / 0.69 = 36.846
+    // bruto = 105.689; belasting = 28.289
+    const r = bruterDividendBox2(77400, { ...BASE_PARAMS, fiscaalPartner: false });
+    expect(Math.round(r.bruto)).toBe(105689);
+    expect(Math.round(r.belasting)).toBe(28289);
+    expect(Math.round(r.inLaagSchijf)).toBe(68843);
+    expect(Math.round(r.inHoogSchijf)).toBe(36846);
+  });
+
+  it('2026-benchmark — netto €77.400 MÉT fiscaal partner: bruto=102.517, belasting=25.117 (volledig lage schijf)', () => {
+    // grens met partner = 68843 × 2 = 137.686
+    // nettoMaxLaag = 137.686 × 0.755 = 103.953  →  77.400 < 103.953 → volledig lage schijf
+    // bruto = 77400 / 0.755 = 102.517; belasting = bruto × 0.245 = 25.117
+    const r = bruterDividendBox2(77400, { ...BASE_PARAMS, fiscaalPartner: true });
+    expect(Math.round(r.bruto)).toBe(102517);
+    expect(Math.round(r.belasting)).toBe(25117);
+    expect(r.inHoogSchijf).toBe(0);
+    // Belasting is exact bruto × 24,5% (volledig lage schijf)
+    expect(Math.round(r.belasting)).toBe(Math.round(r.bruto * 0.245));
+  });
+
 });
