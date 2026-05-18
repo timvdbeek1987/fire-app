@@ -41,11 +41,11 @@ export default function Projectie({
   const [tabIndex, setTabIndex] = useState(0);
   const TABS = ['Portfolio', 'Doelcurves', 'Uitkomstbandbreedte', 'Tabel', 'Benodigde inleg'];
 
-  // Tab 4 — Benodigde inleg state
+  const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
+
+  // Tab 4 — Benodigde inleg state (pensioenLeeftijd moet hierboven staan — anders temporal dead zone)
   const currentYear = new Date().getFullYear();
   const [doelLeeftijd, setDoelLeeftijd] = useState(pensioenLeeftijd);
-
-  const pensioenLeeftijd = params.pensioenLeeftijd ?? 55;
   const pensioenJaar     = birthYear + pensioenLeeftijd;
   const currentAge       = new Date().getFullYear() - birthYear;
 
