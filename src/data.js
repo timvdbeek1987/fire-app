@@ -135,6 +135,21 @@ export const BASE_PARAMS = {
   //   Bewaard als gebruikersparameter zodat het hero-getal reproduceerbaar is na reload.
   latenteVpbActief:           true,
   latenteVpbPct:              30,
+
+  // vpbAfrekenmethode: hoe wordt de VPB-last op beleggingsrendement in de BV verwerkt?
+  //   'actuele_waarde'  (default) — jaarlijks rendement wordt elk jaar belast tegen het
+  //     lopende VPB-tarief (vlak 19%). De opbouwfase doet dit al impliciet (data.js r.568–570).
+  //     Gevolg: bij liquidatie staat er GEEN opgebouwde latente VPB-claim meer open —
+  //     de winst is reeds afgerekend. Sluit aan op de door de boekhouder geadviseerde norm.
+  //   'aankoopwaarde'   (gereserveerd — nog niet ondersteund door de engine) — koerswinst
+  //     wordt uitgesteld en pas bij liquidatie integraal belast via de getrapte VPB-tarieven.
+  //     Vereist een tweede, afzonderlijk rekenpad door projectie + Monte Carlo inclusief
+  //     eigen verificatiefase. Gepland ná ronde één; infrastructuur staat klaar.
+  //
+  //   ⚠ DIT IS GEEN TARIEFPARAMETER: geen peildatum, geen fiscalParams.js-bron.
+  //      Niet opnemen in paramsToSeed (seed-stabiliteit) — keuze beïnvloedt het rekenpad,
+  //      niet de stochastische parameters.
+  vpbAfrekenmethode:          'actuele_waarde',
 };
 
 // ============================================================
