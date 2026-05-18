@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { LayoutDashboard, TrendingUp, LineChart, FlaskConical, Settings, ArrowDownCircle, LogOut, Calculator, Wallet } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, LineChart, Settings, ArrowDownCircle, LogOut, Calculator, Wallet } from 'lucide-react';
 import Dashboard    from './views/Dashboard.jsx';
 import Voortgang    from './views/Voortgang.jsx';
 import Projectie    from './views/Projectie.jsx';
@@ -25,7 +25,6 @@ const NAV = [
   { id: 'voortgang',    label: 'Voortgang',    Icon: TrendingUp      },
   { id: 'projectie',    label: 'Projectie',    Icon: LineChart        },
   { id: 'onttrekking',  label: 'Onttrekking',  Icon: ArrowDownCircle },
-  { id: 'scenarios',    label: "Scenario's",   Icon: FlaskConical     },
   { id: 'planner',      label: 'Planner',      Icon: Calculator      },
   { id: 'salaris',      label: 'Budget',       Icon: Wallet          },
   { id: 'instellingen', label: 'Instellingen', Icon: Settings         },

@@ -544,6 +544,9 @@ export default function Dashboard({
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.1rem' }}>
                 {isPrive ? 'In euro\'s van vandaag · excl. AOW & pensioen' : 'Vóór dividendbelasting · excl. AOW & pensioen'}
               </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.1rem' }}>
+                Methode: annuïteit op P50-portefeuille · Onttrekking-scherm vergelijkt ook 4%-Regel en VPW — afwijking is verwacht en correct
+              </div>
             </div>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', flexShrink: 0 }}>
               {showOnttrekking ? '▲' : '▼'}
@@ -640,7 +643,9 @@ export default function Dashboard({
 
               {/* Methodologie-noot */}
               <div style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
-                ⚠️ <b>Let op:</b> dit bedrag is gebaseerd op het <b>normaal scenario</b> (verwachte portefeuille, mediaan van 2500 simulaties). De FIRE Countdown gebruikt een strengere maatstaf: het vereiste kapitaal waarbij 80% van alle scenario's de portefeuille in stand houdt. Daardoor kan het onttrekkingsbedrag hier hoger lijken dan wat de Countdown als "haalbaar" markeert.
+                ⚠️ <b>Dit getal is een snelle indicatie, geen advies.</b> Twee bekende verschillen met andere getallen in de app:
+                {' '}(1) <b>vs. FIRE Countdown:</b> de Countdown gebruikt een strengere maatstaf (80% van 2500 scenario's houdt portefeuille in stand tot 85j) — daardoor kan dit bedrag hoger lijken dan wat de Countdown als "haalbaar" markeert.
+                {' '}(2) <b>vs. Onttrekking-scherm:</b> dit getal gebruikt de annuïteit-methode (vaste onttrekking, pot leeg op uitputtingsleeftijd). De Onttrekking-pagina rekent daarnaast ook de 4%-Regel (4% van startportefeuille) en VPW (variabel percentage van huidige portefeuille) door — die strategieën hebben andere eigenschappen en geven andere bedragen. Dat is correct: het zijn verschillende keuzes, geen fouten.
               </div>
 
               {/* Belastingnoot */}
