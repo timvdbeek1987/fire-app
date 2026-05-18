@@ -362,8 +362,19 @@ export function berekenNettoBesteedbaar({
   const vpbGrens      = vereist(p, 'vpbGrens');
   const vpbTariefHoog = vereist(p, 'vpbTariefHoog');
 
+  // Onder de actuele-waarde-methode (default, p.vpbAfrekenmethode === 'actuele_waarde') is
+  // het jaarlijkse beleggingsrendement in de opbouwfase al belast: zie r.568–570 in deze file
+  // (vpbBeleg = rendBelegBVb × vennootschapsbelasting, elk simulatiejaar afgedragen).
+  // Er bouwt geen latente VPB-claim op — er valt niets meer te heffen bij liquidatie.
+  // Gevolg: latenteVpb = 0; hero-getal = (bvBruto − latenteBox2) + priveNetto.
+  //
+  // Onder aankoopwaarde (gereserveerd, 'aankoopwaarde' nog niet uitgeleverd) zou de volledige
+  // ongerealiseerde winst hier integraal worden belast via de getrapte VPB-tarieven.
+  // Die tak wacht op een eigen verificatiefase; infrastructuur (vpbAfrekenmethode-parameter)
+  // staat klaar in BASE_PARAMS.
+  const methode = p.vpbAfrekenmethode ?? 'actuele_waarde';
   let latenteVpb = 0;
-  if (ongerealiseerdeWinstBV > 0) {
+  if (methode !== 'actuele_waarde' && ongerealiseerdeWinstBV > 0) {
     const inLaag = Math.min(ongerealiseerdeWinstBV, vpbGrens);
     const inHoog = Math.max(0, ongerealiseerdeWinstBV - vpbGrens);
     latenteVpb   = inLaag * vpbTariefLaag + inHoog * vpbTariefHoog;

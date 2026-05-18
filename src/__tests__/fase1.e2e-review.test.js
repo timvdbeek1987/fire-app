@@ -66,25 +66,24 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
   it('(a) Hero-getal vandaag: volledige waterfall, alle assen actief', () => {
     // Nullijn: zie bestandsheader — alle 10 parameters geciteerd.
     //
-    // ── Stap 1 — latente VPB (beide schijven) ────────────────────────────────
-    // Nullijn: vpbGrens=200.000 (r.35), tariefLaag=19% (r.28), tariefHoog=25,8% (r.42)
-    //   ongerealiseerdeWinstBV = 500.000 > vpbGrens=200.000 → split
-    //   inLaag    = min(500.000, 200.000) = 200.000 → 200.000 × 0,19 = 38.000
-    //   inHoog    = 500.000 − 200.000    = 300.000 → 300.000 × 0,258 = 77.400
-    //   latenteVpb = 38.000 + 77.400 = 115.400
-    //   bvNaVpb    = 1.500.000 − 115.400 = 1.384.600
+    // ── Stap 1 — latente VPB ─────────────────────────────────────────────────
+    // Nullijn: vpbAfrekenmethode='actuele_waarde' (BASE_PARAMS default)
+    //   Rendement jaarlijks al belast in opbouwfase (data.js r.568–570) → latenteVpb = 0
+    //   bvNaVpb = 1.500.000 − 0 = 1.500.000
+    //   BUGFIX dubbele heffing: oud latenteVpb=115.400 (38.000+77.400), bvNaVpb=1.384.600
     //
     // ── Stap 2 — latente box 2, partner ×2 (hoge schijf actief) ─────────────
     // Nullijn: box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51), tariefHoog=31% (r.65)
     //   effectieve grens = 68.843 × 2 = 137.686  ← fiscaalPartner doubling
-    //   1.384.600 > 137.686 → split, hoge schijf actief
+    //   1.500.000 > 137.686 → split, hoge schijf actief  (was: 1.384.600)
     //   box2InLaag = 137.686                    → 137.686 × 0,245 = 33.733,07
-    //   box2InHoog = 1.384.600 − 137.686        → 1.246.914 × 0,31 = 386.543,34
-    //   latenteBox2 = 33.733,07 + 386.543,34 = 420.276,41
+    //   box2InHoog = 1.500.000 − 137.686        → 1.362.314 × 0,31 = 422.317,34  (was: 1.246.914)
+    //   latenteBox2 = 33.733,07 + 422.317,34 = 456.050,41  (oud: 420.276,41)
+    //   Delta latenteBox2: +35.774 (hogere grondslag door wegvallen VPB-aftrek)
     //
     //   Afleiding:
     //     137.686 × 245 / 1.000 = 33.733.070 / 1.000 = 33.733,07  (exact)
-    //     1.246.914 × 31 / 100  = 38.654.334 / 100   = 386.543,34 (exact)
+    //     1.362.314 × 31 / 100  = 42.231.734 / 100   = 422.317,34 (exact)
     //
     // ── Stap 3 — VRH, hvv ×2, gewogen forfait ────────────────────────────────
     // Nullijn: hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
@@ -109,29 +108,30 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     //                      → apart als `nietLiquideVermogen`, niet in priveNetto
     //
     // ── Stap 5 — netto besteedbaar ────────────────────────────────────────────
-    // Karakterisatie-delta: nettoBesteedbaar was 2.055.563 → nu 1.555.563 (−500.000 eigenWoning).
-    //   1.384.600 − 420.276,41 + 591.239,825 = 1.555.563,415 → 1.555.563
+    // Karakterisatie-delta (eerdere fix): was 2.055.563 → 1.555.563 (eigenWoning niet in hero-getal)
+    // BUGFIX dubbele heffing (deze fix): 1.555.563 → 1.635.189 (+79.626)
+    //   1.500.000 − 456.050,41 + 591.239,825 = 1.635.189,415 → 1.635.189
     //
     // ── Apart — niet-liquide vermogen ─────────────────────────────────────────
-    //   nietLiquideVermogen = 500.000 (apart veld — niet in hero-getal)
+    //   nietLiquideVermogen = 500.000 (apart veld — niet in hero-getal; ongewijzigd)
 
     const r = berekenNettoBesteedbaar({ ...PROFIEL, p: P_BASIS });
 
-    // VPB-as: beide schijven geraakt
-    expect(Math.round(r.latenteVpb)).toBe(115400);
-    expect(Math.round(r.bvNaVpb)).toBe(1384600);
+    // VPB-as: actuele_waarde → latenteVpb = 0 (oud: 115.400)
+    expect(r.latenteVpb).toBe(0);
+    expect(Math.round(r.bvNaVpb)).toBe(1500000);        // oud: 1.384.600
 
     // Box 2-as: hoge schijf actief, inLaag = 2 × box2Grens
-    expect(Math.round(r.box2InLaag)).toBe(137686);     // = 68.843 × 2 (partner)
-    expect(Math.round(r.box2InHoog)).toBe(1246914);
-    expect(Math.round(r.latenteBox2)).toBe(420276);
+    expect(Math.round(r.box2InLaag)).toBe(137686);       // = 68.843 × 2 (partner, ongewijzigd)
+    expect(Math.round(r.box2InHoog)).toBe(1362314);      // oud: 1.246.914 (hogere grondslag)
+    expect(Math.round(r.latenteBox2)).toBe(456050);      // oud: 420.276 (+35.774 bugfix)
 
-    // Box 3-as: gewogen forfait, hvv verdubbeld
+    // Box 3-as: gewogen forfait, hvv verdubbeld (ongewijzigd)
     expect(Math.round(r.vrh)).toBe(8760);
-    expect(Math.round(r.priveNetto)).toBe(591240);   // eigenWoning niet meegeteld
+    expect(Math.round(r.priveNetto)).toBe(591240);       // eigenWoning niet meegeteld
 
     // Hero-getal (liquide vermogen only)
-    expect(Math.round(r.nettoBesteedbaar)).toBe(1555563);
+    expect(Math.round(r.nettoBesteedbaar)).toBe(1635189);  // oud: 1.555.563 (+79.626 bugfix)
 
     // Niet-liquide vermogen: apart veld, correct berekend, NIET in hero-getal
     expect(Math.round(r.nietLiquideVermogen)).toBe(500000);
@@ -168,7 +168,7 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     // box2InLaag met partner = 2 × 68.843 = 137.686 (zie test a)
     // box2InLaag zonder partner: grens=68.843; 1.384.600 > 68.843 → box2InLaag = 68.843
     //
-    // VPB: latenteVpb = 115.400 ongeacht partner (VPB is vennootschapsbelasting — geen persoonlijk karakter)
+    // VPB: actuele_waarde → latenteVpb = 0 voor beide (partneronafhankelijk, geen VPB-claim meer)
 
     const metPartner    = berekenNettoBesteedbaar({ ...PROFIEL, p: { ...P_BASIS, fiscaalPartner: true  } });
     const zonderPartner = berekenNettoBesteedbaar({ ...PROFIEL, p: { ...P_BASIS, fiscaalPartner: false } });
@@ -185,9 +185,9 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     expect(Math.round(zonderPartner.vrh)).toBe(9841);
     expect(metPartner.vrh).toBeLessThan(zonderPartner.vrh);
 
-    // (3) VPB: partneronafhankelijk
+    // (3) VPB: 0 voor beide — actuele_waarde is partneronafhankelijk (oud: 115.400 voor beide)
     expect(metPartner.latenteVpb).toBe(zonderPartner.latenteVpb);
-    expect(Math.round(metPartner.latenteVpb)).toBe(115400);
+    expect(metPartner.latenteVpb).toBe(0);   // oud: 115.400 — bugfix dubbele heffing
   });
 
   it('(c) Dubbeltellingscheck: grondslagen niet overlappend, elke vrijstelling precies 1×', () => {
@@ -211,26 +211,22 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
 
     const r = berekenNettoBesteedbaar({ ...PROFIEL, p: P_BASIS });
 
-    // VPB-grondslag = ongerealiseerdeWinstBV (500K), aantoonbaar via inLaag+inHoog splitsing:
-    //   de VPB-berekening zelf is niet direct terug in de output, maar bvNaVpb = bvBruto − latenteVpb
-    //   bewijst dat de VPB alleen op de winst van 500K is geheven.
-    const implicieteVpbGrondslag = Math.round(r.bvBruto - r.bvNaVpb); // = latenteVpb
-    // latenteVpb = 115.400 = f(ongerealiseerdeWinstBV=500.000), niet f(bvBruto=1.500.000)
-    expect(implicieteVpbGrondslag).toBe(115400);
-    // Als bvBruto de VPB-grondslag was: 200K×0.19 + 1300K×0.258 = 38K+335.4K = 373.400 — NIET 115.400
-    expect(implicieteVpbGrondslag).not.toBe(373400);
+    // VPB-as: actuele_waarde → latenteVpb = 0, bvNaVpb = bvBruto (geen VPB-aftrek)
+    //   oud: latenteVpb = 115.400 = f(ongerealiseerdeWinstBV=500.000)
+    const implicieteVpbGrondslag = Math.round(r.bvBruto - r.bvNaVpb); // = latenteVpb = 0
+    expect(implicieteVpbGrondslag).toBe(0);             // oud: 115.400 — bugfix dubbele heffing
+    expect(implicieteVpbGrondslag).not.toBe(373400);    // ook oud bvBruto-variant nooit bereikt
 
-    // box2-grondslag = bvNaVpb (1.384.600), NIET bvBruto (1.500.000)
-    //   box2InLaag + box2InHoog = bvNaVpb (niet bvBruto)
+    // box2-grondslag = bvNaVpb = bvBruto (1.500.000) — actuele_waarde: geen VPB-aftrek
+    //   box2InLaag + box2InHoog = bvNaVpb (ongewijzigd principe, nieuwe waarde)
     expect(Math.round(r.box2InLaag + r.box2InHoog)).toBe(Math.round(r.bvNaVpb));
-    expect(Math.round(r.box2InLaag + r.box2InHoog)).not.toBe(PROFIEL.bvBruto);
+    expect(Math.round(r.bvNaVpb)).toBe(PROFIEL.bvBruto); // actuele_waarde: bvNaVpb = bvBruto
 
-    // box3-grondslag = priveVermogen − hvv (geen BV-component)
-    //   priveVermogen is NIET in nettoBesteedbaar geteld vóór VRH-aftrek gecombineerd met BV
+    // box3-grondslag = priveVermogen − hvv (geen BV-component, ongewijzigd)
     const verwachtPriveVermogen = PROFIEL.priveSpaar + PROFIEL.priveBeleg;
     expect(r.priveVermogen).toBe(verwachtPriveVermogen); // = 600.000, uitsluitend privé
     // hvv-aftrek op privé heeft GEEN effect op bvNaVpb of latenteBox2
-    expect(Math.round(r.bvNaVpb)).toBe(1384600);        // ongewijzigd door hvv
+    expect(Math.round(r.bvNaVpb)).toBe(1500000);        // ongewijzigd door hvv; actuele_waarde: = bvBruto
 
     // Vrijstellingsduplicatie-check: 1× toegepast per as
     //   box2Grens ×2 (partner) = 137.686 — zie box2InLaag = 137.686 in test (a); niet 275.372
@@ -267,8 +263,9 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
     expect(schakelaarAan.latenteBox2).toBe(schakelaarUit.latenteBox2);
     expect(schakelaarAan.priveNetto).toBe(schakelaarUit.priveNetto);
     expect(schakelaarAan.nettoBesteedbaar).toBe(schakelaarUit.nettoBesteedbaar);
-    // Karakterisatie-delta: was 2.055.563 → nu 1.555.563 (eigenWoning niet in hero-getal)
-    expect(Math.round(schakelaarAan.nettoBesteedbaar)).toBe(1555563);
+    // Karakterisatie-delta (eerdere fix): was 2.055.563 → 1.555.563 (eigenWoning niet in hero-getal)
+    // BUGFIX dubbele heffing (deze fix): 1.555.563 → 1.635.189 (+79.626)
+    expect(Math.round(schakelaarAan.nettoBesteedbaar)).toBe(1635189);  // oud: 1.555.563
   });
 
   it('(e) 2028-grensoverschrijding: box3VrhJaar vóór/ná 2028, schakelaar aan/uit', () => {
