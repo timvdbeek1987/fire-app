@@ -142,3 +142,59 @@ FIRE-hefboom voor veel DGA's, maar vereist:
 **Oplossing:** Bouwen als expliciete scenario-hefboom wanneer de scenario-infrastructuur
 beschikbaar is. Analoog aan de 2028-schakelaar: schakelbare aanname met onzekerheids-
 label, niet als stille term in het hero-getal.
+
+---
+
+## TS-08 · Doelcurves: statisch doelkapitaal vervangt glide-path-allocatie
+
+**Status:** open (bewuste modelkeuze)  
+**Prioriteit:** laag — relevant zodra Monte Carlo een portefeuille-allocatiemodel krijgt  
+**Locatie:** `src/data.js` — `berekenPensioenKapitaal()`, `pkVloer`/`pkStreef`; `src/views/Planner.jsx` — tier-berekening
+
+De huidige doelcurves (vloer, streef, comfort) zijn statische kapitaaldrempels berekend op basis
+van een vast onttrekkingspercentage (SWR) en een vaste verwachte return `r`. De projectie gebruikt
+diezelfde `r` over de gehele opbouwfase — er is geen glide-path: geen afbouw van aandelenblootstelling
+naarmate de FIRE-datum nadert.
+
+**Impact:** Een DGA die op koers is voor FIRE in drie jaar heeft in werkelijkheid een conservatiever
+risicoprofiel nodig dan iemand met een horizon van twintig jaar. De huidige engine negeert dat
+sequentie-van-rendementsrisico toeneemt naarmate de horizon krimpt, waardoor de kansberekening
+(P50, P10-banden) te optimistisch is op korte horizons.
+
+**Oplossing:** Voeg een `allocatieGlidePathJaren`-parameter toe die de equity-fractie lineair afbouwt
+van `aandelenFractieMax` naar `aandelenFractieMin` over de opgegeven aanloopperiode vóór FIRE. Herbereken
+`r` per simulatiejaar als gewogen gemiddelde van aandelen- en obligatierendement. Vereist ook een
+aparte Monte Carlo-verificatiefase voor de gewijzigde simulatielus.
+
+---
+
+## TS-09 · VPB-afrekenmethode: aankoopwaarde-pad gereserveerd maar niet uitgeleverd
+
+**Status:** open — infrastructuur klaar, rekenpad ontbreekt  
+**Prioriteit:** medium — DGA's met kostprijsregistratie hebben een materieel ander fiscaal profiel  
+**Locatie:** `src/data.js` — `BASE_PARAMS.vpbAfrekenmethode` (default `'actuele_waarde'`);
+`berekenNettoBesteedbaar()` — `methode !== 'actuele_waarde'`-tak (getrapte VPB al correct);
+`src/views/Instellingen.jsx` — read-only statusregel VPB-tarieven card
+
+De engine ondersteunt twee VPB-afrekenmethoden conceptueel, maar levert er slechts één uit:
+
+- **`actuele_waarde`** (geïmplementeerd, default): beleggingsrendement wordt elk jaar belast in de
+  opbouwfase (data.js r. 568–570: `vpbBeleg = rendBelegBVb × vennootschapsbelasting`). Bij liquidatie
+  geen latente VPB-claim. `berekenNettoBesteedbaar` geeft `latenteVpb = 0`.
+
+- **`aankoopwaarde`** (gereserveerd): koerswinst wordt uitgesteld en pas bij liquidatie belast via de
+  getrapte VPB-tarieven (19% / 25,8%). De waterfall-tak in `berekenNettoBesteedbaar` is correct
+  geïmplementeerd en getest (test I(b) `aankoopwaarde-schakelaar-bewijs`: `latenteVpb = 89.600`). Maar
+  de **opbouwfase-simulatielus** belast het rendement nóg steeds jaarlijks — er is geen apart
+  rekenpad dat de VPB-last uitstelt en ophoogt als uitgestelde schuld. Een schakelaar naar
+  `aankoopwaarde` zou nu **dubbele heffing** produceren: jaarlijks in de lus én bij liquidatie.
+
+**Vereiste werk vóór uitlevering:**
+1. Tweede simulatiefunctie (of vertakking in `runSimulatie`) die onder `aankoopwaarde` de jaarlijkse
+   VPB-aftrek op beleggingsrendement overslaat en in plaats daarvan een cumulatieve kostprijs bijhoudt.
+2. Monte Carlo-verificatiefase voor het nieuwe pad (aparte karakterisatietests).
+3. UI-toggle in Instellingen (vervangt de huidige read-only statusregel).
+4. Migratiescript of waarschuwing voor bestaande gebruikers die onder `actuele_waarde` een seed hebben.
+
+**Bewust niet uitgeleverd in feat/latente-belastingen:** de infrastructuur (parameter + waterfall-tak +
+tests + UI-statusregel) is geland zodat de switch straks één PR is, niet een big-bang-migratie.
