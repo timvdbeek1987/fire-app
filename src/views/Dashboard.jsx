@@ -50,10 +50,6 @@ export default function Dashboard({
   const [showCalc, setShowCalc] = useState(false);
   const [showOnttrekking, setShowOnttrekking] = useState(false);
   const [inflatieCorrectie, setInflatieCorrectie] = useState(true);
-  // Waterfall (1c-ii): instelbare latente VPB-aanname.
-  // Initialisatie vanuit params zodat na reload/herlogin dezelfde aanname actief is.
-  const [latenteVpbActief, setLatenteVpbActief] = useState(() => params.latenteVpbActief ?? true);
-  const [latenteVpbPct, setLatenteVpbPct]       = useState(() => params.latenteVpbPct    ?? 30);
   const [wfExpand, setWfExpand] = useState(new Set());
   const toggleWf = key => setWfExpand(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const isPrive = userType === 'prive';
@@ -120,7 +116,10 @@ export default function Dashboard({
   const priveSpaarNu     = start.priveSpaar ?? 0;
   const priveBelegNu     = Math.max(0, priveNu - priveSpaarNu);
   const wozWaarde        = params.wozWaarde ?? 0;
-  const ongerealiseerdeWinstBV = latenteVpbActief ? Math.round(bvNu * latenteVpbPct / 100) : 0;
+  // Onder de actuele-waarde-methode (default) rekent de opbouwfase het beleggingsrendement
+  // al jaarlijks af met VPB (data.js r.568–570). Er bouwt geen latente VPB-claim op —
+  // ongerealiseerdeWinstBV = 0 zodat berekenNettoBesteedbaar latenteVpb = 0 geeft.
+  const ongerealiseerdeWinstBV = 0;
   const waterfall = !isPrive && bvNu > 0
     ? berekenNettoBesteedbaar({
         bvBruto:               bvNu,
@@ -338,64 +337,25 @@ export default function Dashboard({
             {
               key:    'vpb',
               teken:  '−',
-              label:  latenteVpbActief
-                ? `Latente VPB (${latenteVpbPct}% koerswinst)`
-                : 'Latente VPB',
+              label:  'Latente VPB',
               bedrag: waterfall.latenteVpb,
               kleur:  'var(--red)',
-              sub:    latenteVpbActief
-                ? `19% / 25,8% over €${ongerealiseerdeWinstBV.toLocaleString('nl-NL')} ongerealiseerde winst`
-                : null,
-              subLabel: !latenteVpbActief ? 'excl. latente VPB — aanname uitgestaan' : null,
+              sub:    null,
+              subLabel: 'actuele-waarde-methode — jaarlijks reeds afgerekend',
               detail: (
                 <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                    <span>Aanname actief</span>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        const nieuw = !latenteVpbActief;
-                        setLatenteVpbActief(nieuw);
-                        onParamsChange?.({ ...params, latenteVpbActief: nieuw, latenteVpbPct });
-                      }}
-                      style={{ padding: '0.15rem 0.5rem', borderRadius: 10, border: `1.5px solid ${latenteVpbActief ? 'var(--red)' : 'var(--border)'}`, background: latenteVpbActief ? 'rgba(239,68,68,0.08)' : 'var(--surface-2)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: latenteVpbActief ? 'var(--red)' : 'var(--text-3)' }}
-                    >
-                      {latenteVpbActief ? '● aan' : '○ uit'}
-                    </button>
+                  <div>
+                    Actieve methode: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>actuele waarde</span>
                   </div>
-                  {latenteVpbActief && (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.3rem' }}>
-                        <span>% van BV als ongerealiseerde koerswinst:</span>
-                        <input
-                          type="number" min={0} max={100} step={5}
-                          value={latenteVpbPct}
-                          onClick={e => e.stopPropagation()}
-                          onChange={e => {
-                            const nieuw = Math.max(0, Math.min(100, Number(e.target.value)));
-                            setLatenteVpbPct(nieuw);
-                            onParamsChange?.({ ...params, latenteVpbActief, latenteVpbPct: nieuw });
-                          }}
-                          style={{ width: 56, padding: '0.15rem 0.3rem', border: '1px solid var(--border)', borderRadius: 4, fontFamily: 'var(--font-mono)', fontSize: '0.65rem', background: 'var(--surface-2)', color: 'var(--text)' }}
-                        />
-                        <span>%</span>
-                      </div>
-                      <div>
-                        Getrapt tarief: ≤ €200K winst → 19%; meerdere → 25,8%
-                        {waterfall.latenteVpb > 0 && (
-                          <> · berekend: {fmt(Math.round(waterfall.latenteVpb))}</>
-                        )}
-                      </div>
-                      <div style={{ marginTop: '0.2rem', color: 'var(--amber)' }}>
-                        ⚠️ Conservatieve default. Pas aan op eigen kostprijsregistratie.
-                      </div>
-                    </>
-                  )}
-                  {!latenteVpbActief && (
-                    <div style={{ color: 'var(--text-4)' }}>
-                      Aanname uitgestaan — hero-getal is <b>excl. latente VPB</b>. Zet aan voor conservatieve schatting.
-                    </div>
-                  )}
+                  <div style={{ marginTop: '0.3rem' }}>
+                    Het beleggingsrendement in de BV wordt in de projectie elk jaar belast met VPB
+                    (19% vlak tarief, opbouwfase). Er accumuleert geen ongerealiseerde koerswinst
+                    waarover bij liquidatie nog VPB verschuldigd is — latente VPB = €0.
+                  </div>
+                  <div style={{ marginTop: '0.3rem', color: 'var(--text-4)' }}>
+                    De keuze tussen actuele-waarde- en aankoopwaarde-methode wordt in een volgende
+                    versie instelbaar. Zie Instellingen → VPB-tarieven voor de actieve methode.
+                  </div>
                 </div>
               ),
             },

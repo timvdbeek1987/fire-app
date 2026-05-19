@@ -221,6 +221,19 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
             value={+((local.box2TariefHoog ?? BASE_PARAMS.box2TariefHoog)*100).toFixed(1)}
             onChange={v=>set('box2TariefHoog')(v/100)} step={0.5} suffix="%"
             help="31% over box 2-inkomen boven schijfgrens per persoon (belastingjaar 2026, geverifieerd) — actief per fase 1b"/>
+          <div style={{ marginTop: '1.25rem', padding: '0.65rem 0.85rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline', marginBottom: '0.25rem' }}>
+              <span style={{ color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.07em', fontSize: '0.58rem' }}>VPB-afrekenmethode</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>actuele waarde</span>
+            </div>
+            <div>
+              Het beleggingsrendement wordt elk jaar belast in de opbouwfase (19% vlak tarief).
+              Bij liquidatie staat er geen latente VPB-claim open.
+            </div>
+            <div style={{ marginTop: '0.3rem', color: 'var(--text-4)' }}>
+              De keuze tussen actuele-waarde- en aankoopwaarde-methode wordt in een volgende versie instelbaar.
+            </div>
+          </div>
         </div>}
 
         <div className="card">
