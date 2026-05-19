@@ -548,7 +548,9 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     //
     // Stap 5 — netto besteedbaar (bewijs dat hero-getal = (bvBruto − latenteBox2) + priveNetto):
     //   500.000 − 150.525,205 + 196.962,111 = 546.436,906 → 546.437
-    //   Oud (aankoopwaarde): 533.327. Delta: +13.110 — bugfix dubbele heffing, verwachte stijging hero-getal.
+    //   Oud (aankoopwaarde): 533.327.
+    //   Delta +13.110: dubbele VPB-heffing verwijderd,
+    //     weggevallen latente VPB €19.000 (=100K×19%) − extra box 2 €5.890 (=19K×31%) = €13.110 netto
     const result = berekenNettoBesteedbaar({
       bvBruto: 500000, ongerealiseerdeWinstBV: 100000,
       priveSpaar: 0, priveBeleg: 200000,
@@ -557,11 +559,11 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     });
     expect(result.latenteVpb).toBe(0);                        // actuele_waarde: al jaarlijks afgerekend
     expect(Math.round(result.bvNaVpb)).toBe(500000);          // oud: 481000
-    expect(Math.round(result.latenteBox2)).toBe(150525);      // oud: 144635 (hogere grondslag door wegvallen VPB-aftrek)
+    expect(Math.round(result.latenteBox2)).toBe(150525);      // oud: 144635 (+5.890 door hogere box2-grondslag)
     expect(Math.round(result.vrh)).toBe(3038);                 // ongewijzigd
     expect(Math.round(result.nietLiquideVermogen)).toBe(0);
     expect(Math.round(result.priveNetto)).toBe(196962);        // ongewijzigd
-    expect(Math.round(result.nettoBesteedbaar)).toBe(546437);  // oud: 533327  (+13.110 bugfix)
+    expect(Math.round(result.nettoBesteedbaar)).toBe(546437);  // oud: 533327  (+13.110 netto: +19K VPB − 5.890 extra box2)
     // Bewijs dat hero-getal = (bvBruto − latenteBox2) + priveNetto (geen VPB-term meer):
     expect(Math.round(result.nettoBesteedbaar)).toBe(
       Math.round(result.bvBruto - result.latenteBox2 + result.priveNetto)
@@ -594,7 +596,9 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     //   latenteBox2 = 68.843×24,5% + 341.557×31% = 16.866,535 + 105.882,670 = 122.749,205
     //   nettoBesteedbaar = 410.400 − 122.749,205 + 196.962,111 = 484.612,906 → 484.613
     //
-    // Delta voor 400K-geval: 546.437 − 484.613 = +61.824 — bugfix dubbele heffing, verwachte stijging hero-getal.
+    // Delta voor 400K-geval: 546.437 − 484.613 = +61.824.
+    //   Dubbele VPB-heffing verwijderd,
+    //   weggevallen latente VPB €89.600 (=200K×19%+200K×25,8%) − extra box 2 €27.776 (=89.600×31%) = €61.824 netto
     const metWinst = berekenNettoBesteedbaar({
       bvBruto: 500000, ongerealiseerdeWinstBV: 400000,
       priveSpaar: 0, priveBeleg: 200000,
@@ -609,12 +613,30 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     });
     // Onder actuele_waarde: ongerealiseerdeWinstBV is irrelevant — beide paden identiek
     expect(metWinst.latenteVpb).toBe(0);                                  // oud: 89.600
-    expect(Math.round(metWinst.nettoBesteedbaar)).toBe(546437);           // oud: 484.613 (+61.824 bugfix)
+    expect(Math.round(metWinst.nettoBesteedbaar)).toBe(546437);           // oud: 484.613 (+61.824: +89.600 VPB − 27.776 extra box2)
     expect(zonderWinst.latenteVpb).toBe(0);
     expect(Math.round(zonderWinst.nettoBesteedbaar)).toBe(546437);        // slider irrelevant: zelfde uitkomst
     // Slider maakt geen verschil meer: delta = 0
     const delta = Math.round(zonderWinst.nettoBesteedbaar) - Math.round(metWinst.nettoBesteedbaar);
     expect(delta).toBe(0);
+
+    // ── Bewijs dat schakelaar het juiste pad kiest ───────────────────────────
+    // Onder 'aankoopwaarde' moet de getrapte VPB-berekening wél worden betreden.
+    // Handberekening (nullijn vpbGrens=200K (r.35), tariefLaag=19% (r.28), tariefHoog=25,8% (r.42)):
+    //   inLaag = min(400.000, 200.000) = 200.000 → 200.000 × 0,19 = 38.000
+    //   inHoog = max(0, 400.000−200.000) = 200.000 → 200.000 × 0,258 = 51.600
+    //   latenteVpb = 89.600  (getrapte tak is nu WEL betreden)
+    //   bvNaVpb = 500.000 − 89.600 = 410.400
+    //   latenteBox2 = 16.866,535 + 341.557×31% = 16.866,535 + 105.882,670 = 122.749,205
+    //   nettoBesteedbaar = 410.400 − 122.749,205 + 196.962,111 = 484.612,906 → 484.613
+    const metAankoopwaarde = berekenNettoBesteedbaar({
+      bvBruto: 500000, ongerealiseerdeWinstBV: 400000,
+      priveSpaar: 0, priveBeleg: 200000,
+      wozWaarde: 0, hypotheekRestschuld: 0,
+      p: { ...WATERFALL_P, vpbAfrekenmethode: 'aankoopwaarde' },
+    });
+    expect(Math.round(metAankoopwaarde.latenteVpb)).toBe(89600);     // getrapte tak betreden
+    expect(Math.round(metAankoopwaarde.nettoBesteedbaar)).toBe(484613); // zelfde als oud buggy gedrag
   });
 
   it('(c) Eigen woning apart als nietLiquideVermogen — niet in hero-getal', () => {
@@ -622,8 +644,9 @@ describe('I. berekenNettoBesteedbaar — §5.2-waterfall (2026-params)', () => {
     // Oorzaak: spec-fout §5.2 gecorrigeerd — eigenWoningNetto telde mee in nettoBesteedbaar.
     // eigenWoningNetto is nu een apart veld `nietLiquideVermogen` in het resultaatobject.
     //
-    // BUGFIX dubbele heffing (deze fix): nettoBesteedbaar 533.327 → 546.437 (+13.110).
-    // Oorzaak: actuele_waarde-methode → latenteVpb = 0 → hogere bvNaVpb-grondslag.
+    // BUGFIX dubbele heffing (deze fix): nettoBesteedbaar 533.327 → 546.437.
+    //   Delta +13.110: dubbele VPB-heffing verwijderd,
+    //   weggevallen latente VPB €19.000 (=100K×19%) − extra box 2 €5.890 (=19K×31%) = €13.110 netto
     //
     // Nullijn (zie describe I): vpbGrens=200K (r.35), vpbTariefLaag=19% (r.28),
     //   box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51), tariefHoog=31% (r.65),
@@ -818,7 +841,9 @@ describe('L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking (2026-pa
     //   bvNetto  = 1.500.000 − 460.525,205 = 1.039.474,795
     //   priveNetto = 600.000 − vrh_exact = 590.159 (ongewijzigd)
     //   nettoBesteedbaar = 1.039.474,795 + 590.159 = 1.629.634
-    //   Oud (aankoopwaarde): 1.550.008. Delta: +79.626 — bugfix dubbele heffing, verwachte stijging hero-getal.
+    //   Oud (aankoopwaarde): 1.550.008.
+    //   Delta +79.626: dubbele VPB-heffing verwijderd,
+    //   weggevallen latente VPB €115.400 (200K×19%+300K×25,8%) − extra box 2 €35.774 (=115.400×31%) = €79.626 netto
     const p = { ...L_P, fiscaalPartner: false };
     const r = berekenNettoBesteedbaar({
       bvBruto: 1500000, ongerealiseerdeWinstBV: 500000,
@@ -826,9 +851,9 @@ describe('L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking (2026-pa
       wozWaarde: 750000, hypotheekRestschuld: 250000,
       p,
     });
-    expect(Math.round(r.nettoBesteedbaar)).toBe(1629634);  // oud: 1550008 (+79.626 bugfix)
+    expect(Math.round(r.nettoBesteedbaar)).toBe(1629634);  // oud: 1550008  (+79.626: +115.400 VPB − 35.774 extra box2)
     // Intermediaire waarden bevestigen pad via beide functies:
-    expect(Math.round(r.latenteBox2)).toBe(460525);        // oud: 424751 (hogere grondslag door wegvallen VPB-aftrek)
+    expect(Math.round(r.latenteBox2)).toBe(460525);        // oud: 424751 (+35.774 = 115.400×31%)
     expect(Math.round(r.vrh)).toBe(9841);                  // VRH-pad ongewijzigd
   });
 
@@ -849,7 +874,9 @@ describe('L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking (2026-pa
     //   bvNetto  = 1.500.000 − 456.050,410 = 1.043.949,590
     //   priveNetto = 600.000 − 8.760  = 591.240 (ongewijzigd)
     //   nettoBesteedbaar = 1.043.949,590 + 591.240 = 1.635.189
-    //   Oud (aankoopwaarde): 1.555.563. Delta: +79.626 — bugfix dubbele heffing, verwachte stijging hero-getal.
+    //   Oud (aankoopwaarde): 1.555.563.
+    //   Delta +79.626: dubbele VPB-heffing verwijderd,
+    //   weggevallen latente VPB €115.400 (200K×19%+300K×25,8%) − extra box 2 €35.774 (=115.400×31%) = €79.626 netto
     const p = { ...L_P, fiscaalPartner: true };
     const r = berekenNettoBesteedbaar({
       bvBruto: 1500000, ongerealiseerdeWinstBV: 500000,
@@ -857,8 +884,8 @@ describe('L. fiscaalPartner-toggle — box 2-drempel en VRH doorwerking (2026-pa
       wozWaarde: 750000, hypotheekRestschuld: 250000,
       p,
     });
-    expect(Math.round(r.nettoBesteedbaar)).toBe(1635189);  // oud: 1555563 (+79.626 bugfix)
-    expect(Math.round(r.latenteBox2)).toBe(456050);        // oud: 420276 (hogere grondslag door wegvallen VPB-aftrek)
+    expect(Math.round(r.nettoBesteedbaar)).toBe(1635189);  // oud: 1555563  (+79.626: +115.400 VPB − 35.774 extra box2)
+    expect(Math.round(r.latenteBox2)).toBe(456050);        // oud: 420276 (+35.774 = 115.400×31%)
     expect(Math.round(r.vrh)).toBe(8760);                  // VRH-pad ongewijzigd
   });
 

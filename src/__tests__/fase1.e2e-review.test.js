@@ -66,51 +66,64 @@ describe('K. Integrale end-to-end review — Fase 1 (DGA-FullStack-2026)', () =>
   it('(a) Hero-getal vandaag: volledige waterfall, alle assen actief', () => {
     // Nullijn: zie bestandsheader — alle 10 parameters geciteerd.
     //
-    // ── Stap 1 — latente VPB ─────────────────────────────────────────────────
-    // Nullijn: vpbAfrekenmethode='actuele_waarde' (BASE_PARAMS default)
-    //   Rendement jaarlijks al belast in opbouwfase (data.js r.568–570) → latenteVpb = 0
-    //   bvNaVpb = 1.500.000 − 0 = 1.500.000
-    //   BUGFIX dubbele heffing: oud latenteVpb=115.400 (38.000+77.400), bvNaVpb=1.384.600
+    // ── Volledige handberekening actuele-waarde — elke stap met geciteerde nullijn ──────────
+    //
+    // Invoer: bvBruto=1.500.000, ongerealiseerdeWinstBV=500.000 (GENEGEERD),
+    //         priveSpaar=120.000, priveBeleg=480.000,
+    //         wozWaarde=750.000, hypotheekRestschuld=250.000, fiscaalPartner=true
+    //
+    // ── Stap 1 — latente VPB ──────────────────────────────────────────────────
+    // Nullijn: vpbAfrekenmethode='actuele_waarde' (BASE_PARAMS default, commit e844c09)
+    //   Codepad (data.js berekenNettoBesteedbaar stap 1):
+    //     const methode = p.vpbAfrekenmethode ?? 'actuele_waarde';  // = 'actuele_waarde'
+    //     if (methode !== 'actuele_waarde' && ...)  // → false: getrapte tak NIET betreden
+    //   Reden: het jaarlijkse rendement is al belast in de MC-opbouwfase (data.js r.568–570):
+    //     vpbBeleg = rendBelegBVb × vennootschapsbelasting  (19%, elk simulatiejaar)
+    //   Gevolg: latenteVpb = 0; bvNaVpb = 1.500.000 − 0 = 1.500.000
     //
     // ── Stap 2 — latente box 2, partner ×2 (hoge schijf actief) ─────────────
-    // Nullijn: box2Grens=68.843 (r.58), tariefLaag=24,5% (r.51), tariefHoog=31% (r.65)
-    //   effectieve grens = 68.843 × 2 = 137.686  ← fiscaalPartner doubling
-    //   1.500.000 > 137.686 → split, hoge schijf actief  (was: 1.384.600)
-    //   box2InLaag = 137.686                    → 137.686 × 0,245 = 33.733,07
-    //   box2InHoog = 1.500.000 − 137.686        → 1.362.314 × 0,31 = 422.317,34  (was: 1.246.914)
-    //   latenteBox2 = 33.733,07 + 422.317,34 = 456.050,41  (oud: 420.276,41)
-    //   Delta latenteBox2: +35.774 (hogere grondslag door wegvallen VPB-aftrek)
+    // Nullijn: box2Grens=68.843 (fiscalParams.js r.58), box2TariefLaag=24,5% (r.51),
+    //          box2TariefHoog=31% (r.65); peildatum 2026
+    //   effectieve grens = 68.843 × 2 = 137.686  (fiscaalPartner ×2)
+    //   1.500.000 > 137.686 → split, hoge schijf actief
+    //   box2InLaag = 137.686
+    //   box2InHoog = 1.500.000 − 137.686 = 1.362.314
+    //   137.686 × 245 / 1.000 = 33.733,070     (exact)
+    //   1.362.314 × 31 / 100  = 422.317,340    (exact)
+    //   latenteBox2 = 33.733,070 + 422.317,340 = 456.050,410
     //
-    //   Afleiding:
-    //     137.686 × 245 / 1.000 = 33.733.070 / 1.000 = 33.733,07  (exact)
-    //     1.362.314 × 31 / 100  = 42.231.734 / 100   = 422.317,34 (exact)
-    //
-    // ── Stap 3 — VRH, hvv ×2, gewogen forfait ────────────────────────────────
-    // Nullijn: hvv=59.357 (r.94), forfaitSpaar=1,28% (r.109),
-    //          forfaitBeleg=6,0% (r.101), box3Tarief=36% (r.87)
-    //   totaal          = 120.000 + 480.000 = 600.000
-    //   hvv×2           = 59.357 × 2 = 118.714          ← fiscaalPartner doubling
-    //   grondslag       = 600.000 − 118.714 = 481.286
-    //   grondslagV      = 481.286 / 600.000 = 0,80214333...
-    //   fictiefSpaar    = 120.000 × 0,0128 = 1.536
-    //   fictiefBeleg    = 480.000 × 0,060  = 28.800
-    //   fictiefRendement = 30.336
-    //   30.336 × 481.286 = 14.600.292,096      (decomp: 30.000×481.286 + 336×481.286)
-    //   14.600.292,096 / 600.000 = 24.333,820
+    // ── Stap 3 — VRH (ongewijzigd) ───────────────────────────────────────────
+    // Nullijn: heffingsvrijVermogen=59.357 (r.94), box3ForfaitSpaargeld=1,28% (r.109),
+    //          box3ForfaitOverigeBezittingen=6,0% (r.101), box3Tarief=36% (r.87)
+    //   hvv×2           = 59.357 × 2 = 118.714  (fiscaalPartner ×2)
+    //   fictiefRendement = 120.000×0,0128 + 480.000×0,060 = 1.536 + 28.800 = 30.336
+    //   30.336 × 481.286 = 30.000×481.286 + 336×481.286
+    //                    = 14.438.580 + 161.712,096 = 14.600.292,096
+    //   belastbaarRendement = 14.600.292,096 / 600.000 = 24.333,820
     //   VRH = 24.333,820 × 0,36 = 8.760,175 → 8.760
     //
-    // ── Stap 4 — privé netto (eigenWoning NIET opgeteld — spec-correctie) ────
-    // Karakterisatie-delta: priveNetto was 1.091.240 → nu 591.240 (−500.000 eigenWoning).
-    // Nullijn: hvv=59.357 (r.94), box3Tarief=36% (r.87); peildatum 2026
-    //   priveVermogen    = 600.000
-    //   priveNetto       = 600.000 − 8.760,175 = 591.239,825 → 591.240
-    //   eigenWoningNetto = max(0, 750.000 − 250.000) = 500.000
-    //                      → apart als `nietLiquideVermogen`, niet in priveNetto
+    // ── Stap 4 — privé netto (eigenWoning NIET opgeteld) ─────────────────────
+    //   priveNetto       = 600.000 − 8.760,175 = 591.239,825
+    //   eigenWoningNetto = max(0, 750.000 − 250.000) = 500.000 → `nietLiquideVermogen`
     //
-    // ── Stap 5 — netto besteedbaar ────────────────────────────────────────────
-    // Karakterisatie-delta (eerdere fix): was 2.055.563 → 1.555.563 (eigenWoning niet in hero-getal)
-    // BUGFIX dubbele heffing (deze fix): 1.555.563 → 1.635.189 (+79.626)
-    //   1.500.000 − 456.050,41 + 591.239,825 = 1.635.189,415 → 1.635.189
+    // ── Stap 5 — hero-getal = bvBruto − latenteBox2 + priveNetto ─────────────
+    //   1.500.000 − 456.050,410 + 591.239,825 = 1.635.189,415 → 1.635.189
+    //
+    // ── Kwantitatieve delta t.o.v. oud (aankoopwaarde): waarom €79.626, niet €115.400? ──
+    //   Oud: latenteVpb = 200.000×19% + 300.000×25,8% = 38.000 + 77.400 = 115.400
+    //        bvNaVpb_oud = 1.384.600
+    //        latenteBox2_oud = 33.733,070 + 1.246.914×31% = 33.733,070 + 386.543,340 = 420.276,410
+    //        netto_oud = 1.384.600 − 420.276,410 + 591.239,825 = 1.555.563,415
+    //
+    //   Effect bugfix:
+    //     Δ bvNaVpb         = +115.400  (volledige latenteVpb weggevallen)
+    //     Δ latenteBox2     = +35.774   (extra box 2 op 115.400: bvNaVpb_oud >> grens 137.686
+    //                                    → alle 115.400 extra valt in hoge schijf (31%))
+    //                         115.400 × 0,31 = 35.774 (exact)
+    //     Netto Δ hero-getal = +115.400 − 35.774 = +79.626
+    //
+    //   Algebraïsch: latenteVpb_oud × (1 − box2TariefHoog) = 115.400 × 0,69 = 79.626 ✓
+    //   Bewijs: 1.635.189 − 1.555.563 = 79.626 ✓
     //
     // ── Apart — niet-liquide vermogen ─────────────────────────────────────────
     //   nietLiquideVermogen = 500.000 (apart veld — niet in hero-getal; ongewijzigd)
