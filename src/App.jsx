@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { LayoutDashboard, TrendingUp, LineChart, FlaskConical, Settings, ArrowDownCircle, LogOut, Calculator, Wallet } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, LineChart, Settings, ArrowDownCircle, LogOut, Wallet } from 'lucide-react';
 import Dashboard    from './views/Dashboard.jsx';
 import Voortgang    from './views/Voortgang.jsx';
 import Projectie    from './views/Projectie.jsx';
@@ -7,7 +7,6 @@ import Scenarios    from './views/Scenarios.jsx';
 import Instellingen from './views/Instellingen.jsx';
 import Onboarding   from './views/Onboarding.jsx';
 import Onttrekking  from './views/Onttrekking.jsx';
-import Planner      from './views/Planner.jsx';
 import Budget       from './views/Salaris.jsx';
 import {
   BASE_PARAMS, meestRecenteSpaar, getProjectionStart, runMonteCarlo,
@@ -25,8 +24,6 @@ const NAV = [
   { id: 'voortgang',    label: 'Voortgang',    Icon: TrendingUp      },
   { id: 'projectie',    label: 'Projectie',    Icon: LineChart        },
   { id: 'onttrekking',  label: 'Onttrekking',  Icon: ArrowDownCircle },
-  { id: 'scenarios',    label: "Scenario's",   Icon: FlaskConical     },
-  { id: 'planner',      label: 'Planner',      Icon: Calculator      },
   { id: 'salaris',      label: 'Budget',       Icon: Wallet          },
   { id: 'instellingen', label: 'Instellingen', Icon: Settings         },
 ];
@@ -488,7 +485,6 @@ export default function App() {
       case 'projectie':    return <Projectie    {...sharedProps} />;
       case 'onttrekking':  return <Onttrekking  {...sharedProps} />;
       case 'scenarios':    return <Scenarios    {...sharedProps} />;
-      case 'planner':      return <Planner      {...sharedProps} />;
       case 'salaris':      return <Budget params={effectiveParams} onParamsChange={saveParams} />;
       case 'instellingen': return <Instellingen {...sharedProps} />;
       default:             return <Dashboard    {...sharedProps} />;

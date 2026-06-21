@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { BASE_PARAMS, fmtFull, fmtPct } from '../data.js';
+import { ACTIEVE_FISCALE_PARAMS, checkStaleness } from '../fiscalParams.js';
 
 const F = ({ label, help, value, onChange, step=1, min, max, suffix, prefix }) => (
   <div className="form-group">
@@ -40,9 +41,15 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
   const pensioenJaar = geboortejaar + (local.pensioenLeeftijd ?? 55);
   const currentYear  = new Date().getFullYear();
   const jaarHypo     = local.jaarHypotheekvrij ?? BASE_PARAMS.jaarHypotheekvrij;
+  const staleness    = checkStaleness();
 
   return (
     <div className="fade-up">
+      {staleness.items?.map((item, i) => (
+        <div key={i} style={{ padding: '0.75rem 1rem', background: item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.08)', border: `1px solid ${item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.35)'}`, borderRadius: 'var(--r)', marginBottom: '0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: item.type === 'verkeerd_jaar' ? '#dc2626' : '#b45309' }}>
+          {item.type === 'verkeerd_jaar' ? '🚨' : '⚠️'} {item.reden}
+        </div>
+      ))}
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Configuratie</div>
@@ -125,25 +132,108 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
           <F label="Pensioen / lijfrente netto/jaar"
             value={local.jaarlijksNettoSPMS ?? (isPrive ? 0 : BASE_PARAMS.jaarlijksNettoSPMS)} onChange={set('jaarlijksNettoSPMS')} prefix="€" step={250}
             help={`Netto pensioeninkomen (werkgever, lijfrente, etc.) vanaf leeftijd ${local.spmsLeeftijd??60} jaar. Verlaagt de onttrekkingsbehoefte.`}/>
-          <F label="AOW netto/jaar" value={local.jaarlijksNettoAOW ?? BASE_PARAMS.jaarlijksNettoAOW} onChange={set('jaarlijksNettoAOW')} prefix="€" step={250}
-            help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto)`}/>
+          <F label="AOW netto/jaar ⚠️ te verifiëren" value={local.jaarlijksNettoAOW ?? BASE_PARAMS.jaarlijksNettoAOW} onChange={set('jaarlijksNettoAOW')} prefix="€" step={250}
+            help={`AOW-uitkering vanaf ${local.aowLeeftijd??67} jaar (netto) — bedragen worden halfjaarlijks geïndexeerd; verifieer via svb.nl`}/>
         </div>
 
         {!isPrive && <div className="card">
           <div className="card-title" style={{ marginBottom:'1rem' }}>🧾 Belastingen & DGA</div>
           <F label="Vennootschapsbelasting (VPB)" value={+(local.vennootschapsbelasting*100).toFixed(1)}
             onChange={v=>set('vennootschapsbelasting')(v/100)} step={0.5} suffix="%"
-            help="19% over eerste €200K winst (2024)"/>
+            help="19% over eerste €200K winst (belastingjaar 2026, geverifieerd)"/>
           <F label="Dividendbelasting (Box 2)" value={+(local.dividendbelasting*100).toFixed(1)}
             onChange={v=>set('dividendbelasting')(v/100)} step={0.5} suffix="%"
-            help="24,5% (2024)"/>
-          <F label="Inkomstenbelasting DGA-salaris" value={+(local.inkomstenbelasting*100).toFixed(1)}
-            onChange={v=>set('inkomstenbelasting')(v/100)} step={0.5} suffix="%"/>
-          <F label="Verplicht DGA-salaris" value={local.verplichtDGAsalaris ?? BASE_PARAMS.verplichtDGAsalaris} onChange={set('verplichtDGAsalaris')} prefix="€" step={1000}
-            help="Gebruikelijk loon minimum"/>
-          <F label="Vermogensrendementsheffing (Privé)" value={+(local.vermogensrendementsheffing*100).toFixed(3)}
+            help="24,5% (belastingjaar 2026, geverifieerd)"/>
+          <F label="Inkomstenbelasting DGA-salaris ⚠️ te verifiëren" value={+(local.inkomstenbelasting*100).toFixed(1)}
+            onChange={v=>set('inkomstenbelasting')(v/100)} step={0.5} suffix="%"
+            help="Effectief marginaal tarief box 1 — sterk afhankelijk van aftrekposten en kortingen. Verifieer met je accountant."/>
+          <F label="Verplicht DGA-salaris ⚠️ te verifiëren" value={local.verplichtDGAsalaris ?? BASE_PARAMS.verplichtDGAsalaris} onChange={set('verplichtDGAsalaris')} prefix="€" step={1000}
+            help="Gebruikelijk loon norm 2025 (2026 te verifiëren bij Belastingdienst)"/>
+          <F label="Vermogensrendementsheffing (Privé) ⚠️ te verifiëren" value={+(local.vermogensrendementsheffing*100).toFixed(3)}
             onChange={v=>set('vermogensrendementsheffing')(v/100)} step={0.01} suffix="%"
-            help="Box 3 effectief tarief (2024: ~2.09%)"/>
+            help="Box 3 effectief tarief — forfaits wijzigen jaarlijks; onder voorbehoud rechtszaak HR (2026 nog niet definitief)"/>
+
+          {/* 2028-schakelaar werkelijk-rendementstelsel */}
+          <div style={{ marginTop:'1rem', padding:'0.75rem 0.9rem', background:'rgba(99,102,241,0.06)', borderRadius:'var(--r)', border:'1px solid rgba(99,102,241,0.18)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'1rem', marginBottom:'0.5rem' }}>
+              <span style={{ fontSize:'0.82rem', fontWeight:600, color:'var(--ink)' }}>
+                Werkelijk-rendementstelsel box 3 per 2028
+              </span>
+              <button
+                type="button"
+                onClick={() => set('box3WerkelijkRendement2028')(
+                  (local.box3WerkelijkRendement2028 ?? 0) > 0 ? 0 : 0.04
+                )}
+                style={{
+                  padding:'0.25rem 0.75rem', fontSize:'0.75rem', fontWeight:600,
+                  borderRadius:'var(--r)', border:'none', cursor:'pointer',
+                  background: (local.box3WerkelijkRendement2028 ?? 0) > 0 ? 'rgba(99,102,241,0.85)' : 'rgba(0,0,0,0.08)',
+                  color: (local.box3WerkelijkRendement2028 ?? 0) > 0 ? '#fff' : 'var(--ink-muted)',
+                  transition:'background 0.15s',
+                }}
+              >
+                {(local.box3WerkelijkRendement2028 ?? 0) > 0 ? 'AAN' : 'UIT'}
+              </button>
+            </div>
+            {(local.box3WerkelijkRendement2028 ?? 0) > 0 && (
+              <F label="Aangenomen werkelijk rendement vanaf 2028"
+                value={+((local.box3WerkelijkRendement2028) * 100).toFixed(1)}
+                onChange={v => set('box3WerkelijkRendement2028')(v / 100)}
+                step={0.5} suffix="%" min={0.5} max={20}
+                help="Vervangen het forfait per 2028 — gebruikt dezelfde grondslag en heffingsvrijvermogen als het forfaitstelsel"/>
+            )}
+            <div style={{ fontSize:'0.72rem', color:'var(--ink-muted)', lineHeight:1.55, marginTop:'0.5rem' }}>
+              Invoering werkelijk-rendementstelsel per 2028 is wettelijk aangekondigd maar politiek
+              onzeker en al eerder uitgesteld — dit is een schakelbare aanname, geen voorspelling.
+            </div>
+          </div>
+        </div>}
+
+        {!isPrive && <div className="card">
+          <div style={{ padding:'0.6rem 0.8rem', background:'rgba(245,158,11,0.08)', borderRadius:'var(--r)', border:'1px solid rgba(245,158,11,0.25)', marginBottom:'1rem', fontSize:'0.75rem', color:'var(--ink-muted)', fontFamily:'var(--font-mono)', lineHeight:1.6 }}>
+            ⚠️ Fiscale tarieven — peildatum 2026. Controleer met je accountant; tarieven wijzigen jaarlijks.
+          </div>
+          <div className="card-title" style={{ marginBottom:'0.4rem' }}>🏛️ VPB-tarieven</div>
+          <div style={{ fontFamily:'var(--font-mono)', fontSize:'0.64rem', color:'var(--ink-muted)', marginBottom:'1rem' }}>
+            Fiscale regels belastingjaar {ACTIEVE_FISCALE_PARAMS.belastingjaar} · Laatst gecontroleerd: {ACTIEVE_FISCALE_PARAMS.geverifieerd_op}
+          </div>
+          <F label="VPB laag tarief (t/m schijfgrens)"
+            value={+((local.vpbTariefLaag ?? BASE_PARAMS.vpbTariefLaag)*100).toFixed(1)}
+            onChange={v=>set('vpbTariefLaag')(v/100)} step={0.5} suffix="%"
+            help="Wet Vpb — 19% over winst t/m schijfgrens (belastingjaar 2026, geverifieerd)"/>
+          <F label="VPB schijfgrens"
+            value={local.vpbGrens ?? BASE_PARAMS.vpbGrens}
+            onChange={set('vpbGrens')} prefix="€" step={10000}
+            help="Grens laag/hoog VPB-tarief — €200.000 (belastingjaar 2026, geverifieerd)"/>
+          <F label="VPB hoog tarief (boven schijfgrens)"
+            value={+((local.vpbTariefHoog ?? BASE_PARAMS.vpbTariefHoog)*100).toFixed(1)}
+            onChange={v=>set('vpbTariefHoog')(v/100)} step={0.5} suffix="%"
+            help="Wet Vpb — 25,8% over winst boven schijfgrens (belastingjaar 2026, geverifieerd)"/>
+          <F label="Box 2 tarief laag (t/m schijfgrens p.p.)"
+            value={+((local.box2TariefLaag ?? BASE_PARAMS.box2TariefLaag)*100).toFixed(1)}
+            onChange={v=>set('box2TariefLaag')(v/100)} step={0.5} suffix="%"
+            help="Wet IB 2001 art. 2.12 — 24,5% t/m schijfgrens per persoon (belastingjaar 2026, geverifieerd)"/>
+          <F label="Box 2 schijfgrens per persoon"
+            value={local.box2Grens ?? BASE_PARAMS.box2Grens}
+            onChange={set('box2Grens')} prefix="€" step={1000}
+            help="€68.843 per persoon fiscaal partner (belastingjaar 2026, geverifieerd)"/>
+          <F label="Box 2 tarief hoog"
+            value={+((local.box2TariefHoog ?? BASE_PARAMS.box2TariefHoog)*100).toFixed(1)}
+            onChange={v=>set('box2TariefHoog')(v/100)} step={0.5} suffix="%"
+            help="31% over box 2-inkomen boven schijfgrens per persoon (belastingjaar 2026, geverifieerd) — actief per fase 1b"/>
+          <div style={{ marginTop: '1.25rem', padding: '0.65rem 0.85rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline', marginBottom: '0.25rem' }}>
+              <span style={{ color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.07em', fontSize: '0.58rem' }}>VPB-afrekenmethode</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>actuele waarde</span>
+            </div>
+            <div>
+              Het beleggingsrendement wordt elk jaar belast in de opbouwfase (19% vlak tarief).
+              Bij liquidatie staat er geen latente VPB-claim open.
+            </div>
+            <div style={{ marginTop: '0.3rem', color: 'var(--text-4)' }}>
+              De keuze tussen actuele-waarde- en aankoopwaarde-methode wordt in een volgende versie instelbaar.
+            </div>
+          </div>
         </div>}
 
         <div className="card">
@@ -226,6 +316,32 @@ export default function Instellingen({ params, onParamsChange, userType = 'dga',
                 help="Gemiddelde jaarlijkse bijdrage van partner"/>
             </>
           )}
+
+          {/* Fiscaal partnerschap — bewust gescheiden van partnerActief hierboven.
+              partnerActief = vermogen samenvoegen voor projectie (functioneel begrip).
+              fiscaalPartner = fiscaalrechtelijk partnerschap conform Wet IB art. 5a
+                               (vereist huwelijk, geregistreerd partnerschap of
+                               specifieke samenwoningscriteria — NIET automatisch
+                               gelijk aan partnerActief). */}
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+            <div className="form-group">
+              <label className="form-label">Fiscaal partner (Wet IB art. 5a)</label>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                {[{ v: false, l: 'Nee' }, { v: true, l: 'Ja' }].map(({ v, l }) => (
+                  <button key={String(v)} type="button"
+                    onClick={() => set('fiscaalPartner')(v)}
+                    style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--r)', border: `1.5px solid ${(local.fiscaalPartner ?? false) === v ? 'var(--accent)' : 'var(--border)'}`, background: (local.fiscaalPartner ?? false) === v ? 'var(--accent-soft)' : 'var(--surface)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}
+                  >{l}</button>
+                ))}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.64rem', color: 'var(--ink-muted)', marginTop: '0.35rem', fontStyle: 'italic', lineHeight: 1.55 }}>
+                Verdubbelt de box 2-drempel (2 × €{(local.box2Grens ?? 68843).toLocaleString('nl-NL')}) en het
+                heffingsvrijvermogen (2 × €{(local.heffingsvrijVermogen ?? 59357).toLocaleString('nl-NL')}).
+                Losstaat van "Partner toevoegen" hierboven — dat betreft het samenvoegen van
+                vermogens voor de projectie, niet het fiscaalrechtelijk partnerschap.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

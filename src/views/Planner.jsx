@@ -9,15 +9,6 @@ function vereistInleg(huidigePortfolio, doel, jaren, r) {
   return Math.max(0, (doel - fv) / af);
 }
 
-function jarenTotFire(huidigePortfolio, inlegPerJaar, doel, r) {
-  if (doel <= 0) return 0;
-  let v = huidigePortfolio;
-  for (let j = 1; j <= 60; j++) {
-    v = v * (1 + r) + inlegPerJaar;
-    if (v >= doel) return j;
-  }
-  return null;
-}
 
 export default function Planner({ params, start, pkVloer, pkStreef, pensioenKapitaal, birthYear, userType }) {
   const isPrive = userType === 'prive';
@@ -26,7 +17,6 @@ export default function Planner({ params, start, pkVloer, pkStreef, pensioenKapi
   const currentYear = new Date().getFullYear();
   const currentAge = currentYear - (birthYear ?? 1985);
 
-  const huidigInleg = (isPrive ? 0 : (params?.inlegJaarlijksBV ?? 0)) + (params?.inlegJaarlijksPrive ?? 0);
   const huidigPortfolio = (start?.bv ?? 0) + (start?.prive ?? 0);
 
   const [doelLeeftijd, setDoelLeeftijd] = useState(pensioenLeeftijd);
@@ -92,38 +82,7 @@ export default function Planner({ params, start, pkVloer, pkStreef, pensioenKapi
         </div>
       </div>
 
-      {/* Card 2: FIRE leeftijd bij huidige inleg */}
-      <div className="card" style={{ marginBottom: '1.25rem' }}>
-        <div className="card-header">
-          <div>
-            <div className="card-title">FIRE leeftijd bij huidige inleg</div>
-            <div className="card-subtitle">
-              Wanneer ben ik FIRE bij huidige inleg van {fmt(huidigInleg)}/jaar?
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '0.75rem' }}>
-          {tiers.map(({ label, pk, kleur }) => {
-            const jaren_tot = pk > 0 ? jarenTotFire(huidigPortfolio, huidigInleg, pk, r) : null;
-            const fireLeeftijd = jaren_tot != null ? currentAge + jaren_tot : null;
-            const fireJaar     = jaren_tot != null ? currentYear + jaren_tot : null;
-            return (
-              <div key={label} style={{ padding: '1rem', borderRadius: 'var(--r)', background: 'var(--surface-2)', borderLeft: `3px solid ${kleur}` }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: kleur, marginBottom: '0.4rem' }}>{label}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 700 }}>
-                  {pk <= 0 ? '—' : fireLeeftijd === null ? 'Niet bereikbaar' : `${fireLeeftijd}j (${fireJaar})`}
-                </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.64rem', color: 'var(--text-3)', marginTop: '0.25rem' }}>
-                  {jaren_tot != null ? `over ${jaren_tot} jaar` : ''}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Disclaimer */}
+{/* Disclaimer */}
       <div style={{
         padding: '0.75rem 1rem', borderRadius: 'var(--r)',
         background: 'var(--surface-2)', border: '1px solid var(--border)',

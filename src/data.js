@@ -3,6 +3,9 @@
 // Generiek: geen persoonlijke data, multi-user geschikt
 // ============================================================
 
+import { getFiscaleWaarden, ACTIEVE_FISCALE_PARAMS } from './fiscalParams.js';
+const _fp = getFiscaleWaarden();
+
 // Standaard geboortejaar als module-level fallback.
 // Alle engine-functies gebruiken p.geboortejaar ?? BIRTH_YEAR.
 export const BIRTH_YEAR = 1990;
@@ -73,10 +76,32 @@ export const BASE_PARAMS = {
   jaarlijksNettoSPMS:         33750,
   jaarlijksNettoAOW:          16680,
   verplichtDGAsalaris:        20000,
-  dividendbelasting:          0.245,
-  vennootschapsbelasting:     0.19,
-  inkomstenbelasting:         0.43,
-  vermogensrendementsheffing: 0.02088,
+  // === Fiscale parameters — uit geversioneerde bron (src/fiscalParams.js) ===
+  // VPB
+  vpbTariefLaag:              _fp.vpbTariefLaag,
+  vpbGrens:                   _fp.vpbGrens,
+  vpbTariefHoog:              _fp.vpbTariefHoog,
+  // Box 2
+  box2TariefLaag:             _fp.box2TariefLaag,
+  box2Grens:                  _fp.box2Grens,
+  box2TariefHoog:             _fp.box2TariefHoog,
+  // Dividendbelasting bronheffing
+  dividendbelastingVoorheffing: _fp.dividendbelastingVoorheffing,
+  // Box 3 / VRH (huidig forfaitair stelsel — onder voorbehoud rechtszaak)
+  box3Tarief:                       _fp.box3Tarief,
+  heffingsvrijVermogen:             _fp.heffingsvrijVermogen,
+  box3ForfaitOverigeBezittingen:    _fp.box3ForfaitOverigeBezittingen,
+  box3ForfaitSpaargeld:             _fp.box3ForfaitSpaargeld,
+  box3ForfaitSchulden:              _fp.box3ForfaitSchulden,
+  // Afgeleid effectief tarief — uitsluitend nog als referentiewaarde; engine gebruikt box3Heffing().
+  vermogensrendementsheffing:       _fp.vermogensrendementsheffing,
+  // Inkomstenbelasting (globale effectieve tarieven — pas aan op eigen situatie)
+  inkomstenbelasting:         _fp.inkomstenbelasting,
+  // DEPRECATED ALIAS — uitsluitend als hash-anker in paramsToSeed (seed-stabiliteit voor nSims=1 tests).
+  // Niet gebruiken als berekeningsinput. Verwijderen zodra D-tests naar nSims≥100 gemigreerd zijn.
+  dividendbelasting:          _fp.box2TariefLaag,
+  // Vennootschapsbelasting (achterwaartse compatibiliteit — alias voor vpbTariefLaag)
+  vennootschapsbelasting:     _fp.vpbTariefLaag,
   jaarHypotheekvrij:          2050,
   maandelijkseHypotheeklast:  2000,
   hypotheekRestschuld:        150000,
@@ -88,6 +113,43 @@ export const BASE_PARAMS = {
   spaarrenteBV:               0.025,
   spaarrentePrive:            0.025,
   uitputtingsLeeftijd:        90,
+  // 2028-schakelaar werkelijk rendementstelsel — 0 = uit (forfait ongewijzigd doorgetrokken)
+  box3WerkelijkRendement2028: 0,
+
+  // ── Gebruikerssituatie-flags ──────────────────────────────────────────────
+  // Dit zijn eigenschappen van de fiscale positie van de gebruiker, GEEN tariefparameters
+  // uit de belastingwetgeving. Ze hebben geen peildatum en zijn niet via paramsToSeed te hashen.
+  // Ze beïnvloeden wél fiscale berekeningen — ze kwalificeren de structuur, niet de tarieven.
+  //
+  // fiscaalPartner: verdubbelt de box 2-drempel (×2 × box2Grens) én het heffingsvrijvermogen
+  //   (×2 × heffingsvrijVermogen) conform Wet IB 2001 art. 5a.
+  //   Losstaat van partnerActief (= vermogen samenvoegen voor projectie).
+  //   Mag NOOIT automatisch worden afgeleid uit partnerActief — het zijn juridisch
+  //   verschillende begrippen: fiscaal partnerschap vereist huwelijk, geregistreerd
+  //   partnerschap of specifieke samenwoningscriteria.
+  fiscaalPartner:             false,
+
+  // latenteVpbActief / latenteVpbPct: aanname ongerealiseerde koerswinst in BV.
+  //   latenteVpbActief = true  → ongerealiseerdeWinstBV = bvNu × latenteVpbPct/100
+  //   latenteVpbActief = false → ongerealiseerdeWinstBV = 0  (excl. latente VPB)
+  //   Bewaard als gebruikersparameter zodat het hero-getal reproduceerbaar is na reload.
+  latenteVpbActief:           true,
+  latenteVpbPct:              30,
+
+  // vpbAfrekenmethode: hoe wordt de VPB-last op beleggingsrendement in de BV verwerkt?
+  //   'actuele_waarde'  (default) — jaarlijks rendement wordt elk jaar belast tegen het
+  //     lopende VPB-tarief (vlak 19%). De opbouwfase doet dit al impliciet (data.js r.568–570).
+  //     Gevolg: bij liquidatie staat er GEEN opgebouwde latente VPB-claim meer open —
+  //     de winst is reeds afgerekend. Sluit aan op de door de boekhouder geadviseerde norm.
+  //   'aankoopwaarde'   (gereserveerd — nog niet ondersteund door de engine) — koerswinst
+  //     wordt uitgesteld en pas bij liquidatie integraal belast via de getrapte VPB-tarieven.
+  //     Vereist een tweede, afzonderlijk rekenpad door projectie + Monte Carlo inclusief
+  //     eigen verificatiefase. Gepland ná ronde één; infrastructuur staat klaar.
+  //
+  //   ⚠ DIT IS GEEN TARIEFPARAMETER: geen peildatum, geen fiscalParams.js-bron.
+  //      Niet opnemen in paramsToSeed (seed-stabiliteit) — keuze beïnvloedt het rekenpad,
+  //      niet de stochastische parameters.
+  vpbAfrekenmethode:          'actuele_waarde',
 };
 
 // ============================================================
@@ -167,7 +229,7 @@ function paramsToSeed(params, start) {
     nettoInkomenDoel: params.nettoInkomenDoel,
     inlegJaarlijksBV: params.inlegJaarlijksBV,
     inlegJaarlijksPrive: params.inlegJaarlijksPrive,
-    dividendbelasting: params.dividendbelasting,
+    dividendbelasting: params.dividendbelasting,  // hash-anker — zie BASE_PARAMS toelichting
     vennootschapsbelasting: params.vennootschapsbelasting,
     hypotheekAflosMethode: params.hypotheekAflosMethode,
     hypotheekAflosJaar: params.hypotheekAflosJaar,
@@ -186,6 +248,266 @@ function paramsToSeed(params, start) {
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
+}
+
+function vereist(p, sleutel) {
+  if (p[sleutel] == null) throw new Error(`Fiscale parameter '${sleutel}' ontbreekt in params — controleer fiscalParams.js`);
+  return p[sleutel];
+}
+
+/**
+ * Berekent het bruto dividend dat een BV moet uitkeren om 'nettoNodig' netto te leveren,
+ * rekening houdend met het getrapte box 2-tarief.
+ *
+ * Drempel verdubbelt bij fiscaal partner (p.fiscaalPartner === true).
+ * Leest uitsluitend uit de geversioneerde params — geen interne fallback-constanten.
+ *
+ * @param {number} nettoNodig  Benodigd netto bedrag na box 2-heffing (jaarlijks)
+ * @param {object} p           Params-object (moet box2TariefLaag/Hoog/Grens bevatten)
+ * @returns {{ bruto: number, belasting: number, inLaagSchijf: number, inHoogSchijf: number }}
+ */
+/**
+ * Berekent het benodigde bruto dividend om een gewenst nettobedrag over te houden na box 2-heffing.
+ *
+ * Volgt het getrapte box 2-stelsel:
+ *   - Lage schijf : tariefLaag (24,5% in 2026) over eerste box2Grens bruto (×2 bij fiscaalPartner)
+ *   - Hoge schijf : tariefHoog (31,0% in 2026) over het meerdere
+ *
+ * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
+ *
+ * @param {number} nettoNodig  Gewenst netto-bedrag na box 2-belasting (€)
+ * @param {object} p           Params-object (box2Grens, box2TariefLaag, box2TariefHoog, fiscaalPartner)
+ * @returns {{ bruto: number, belasting: number, inLaagSchijf: number, inHoogSchijf: number }}
+ *   bruto        = benodigde dividenduitkering vóór belasting
+ *   belasting    = bruto − nettoNodig
+ *   inLaagSchijf = bruto-deel belast in lage schijf
+ *   inHoogSchijf = bruto-deel belast in hoge schijf (0 als volledig in lage schijf)
+ */
+export function bruterDividendBox2(nettoNodig, p) {
+  if (nettoNodig <= 0) return { bruto: 0, belasting: 0, inLaagSchijf: 0, inHoogSchijf: 0 };
+
+  const grens      = vereist(p, 'box2Grens') * (p.fiscaalPartner ? 2 : 1);
+  const tariefLaag = vereist(p, 'box2TariefLaag');
+  const tariefHoog = vereist(p, 'box2TariefHoog');
+
+  // Maximaal netto uit de lage schijf
+  const nettoMaxLaag = grens * (1 - tariefLaag);
+
+  if (nettoNodig <= nettoMaxLaag) {
+    // Volledig binnen lage schijf
+    const bruto = nettoNodig / (1 - tariefLaag);
+    return {
+      bruto,
+      belasting:    bruto - nettoNodig,
+      inLaagSchijf: bruto,
+      inHoogSchijf: 0,
+    };
+  }
+
+  // Deels lage schijf, deels hoge schijf
+  const brutoLaag = grens;
+  const nettoLaag = grens * (1 - tariefLaag);
+  const brutoHoog = (nettoNodig - nettoLaag) / (1 - tariefHoog);
+
+  return {
+    bruto:        brutoLaag + brutoHoog,
+    belasting:    brutoLaag + brutoHoog - nettoNodig,
+    inLaagSchijf: brutoLaag,
+    inHoogSchijf: brutoHoog,
+  };
+}
+
+/**
+ * Berekent de §5.2-waterfall: netto besteedbaar vandaag vanuit bruto BV-vermogen.
+ *
+ * SPEC §5.2 (gecorrigeerd): het hero-getal is uitsluitend besteedbaar vermogen.
+ * Eigenwoning-overwaarde (WOZ − hypotheek) is GEEN term in nettoBesteedbaar; hij wordt
+ * apart teruggegeven als `nietLiquideVermogen`. Verzilvering (verkleinen/herfinancieren)
+ * is een toekomstige scenario-hefboom — bewust buiten het besteedbare getal gehouden,
+ * analoog aan de 2028-schakelaar.
+ *
+ * Waterfall:
+ *   Stap 1  Latente VPB op ongerealiseerde koerswinst (getrapt 19% / 25,8% over €200K-grens)
+ *   Stap 2  BV na latente VPB
+ *   Stap 3  Latente box 2 op uitkeerbaar BV-vermogen (getrapt 24,5% / 31%, ×2 bij fiscaalPartner)
+ *   Stap 4  Privé netto = privévermogen − VRH (box3Heffing)   [eigenWoning NIET opgeteld]
+ *   Stap 5  Netto besteedbaar = (bvNaVpb − latenteBox2) + priveNetto
+ *   Apart   Niet-liquide vermogen = max(0, WOZ − hypotheek)   [apart veld, niet in hero-getal]
+ *
+ * ongerealiseerdeWinstBV = 0 → stap 1 slaat over (label "excl. latente VPB" in UI).
+ * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
+ *
+ * @param {object} invoer
+ *   bvBruto                — marktwaarde BV-vermogen (€)
+ *   ongerealiseerdeWinstBV — aanname ongerealiseerde koerswinst in BV (€); 0 = excl. latente VPB
+ *   priveSpaar             — spaargeldcomponent privé-vermogen (€)
+ *   priveBeleg             — beleggingscomponent privé-vermogen (€)
+ *   wozWaarde              — WOZ-waarde eigen woning (€; 0 of weglaten als geen)
+ *   hypotheekRestschuld    — resterende hypotheekschuld (€)
+ *   p                      — params-object
+ * @returns {{ bvBruto, latenteVpb, bvNaVpb, latenteBox2, box2InLaag, box2InHoog,
+ *             priveVermogen, vrh, priveNetto, nettoBesteedbaar, nietLiquideVermogen }}
+ */
+export function berekenNettoBesteedbaar({
+  bvBruto,
+  ongerealiseerdeWinstBV,
+  priveSpaar,
+  priveBeleg,
+  wozWaarde = 0,
+  hypotheekRestschuld = 0,
+  p,
+}) {
+  // ── Stap 1: latente VPB op ongerealiseerde koerswinst ──────────────────────
+  const vpbTariefLaag = vereist(p, 'vpbTariefLaag');
+  const vpbGrens      = vereist(p, 'vpbGrens');
+  const vpbTariefHoog = vereist(p, 'vpbTariefHoog');
+
+  // Onder de actuele-waarde-methode (default, p.vpbAfrekenmethode === 'actuele_waarde') is
+  // het jaarlijkse beleggingsrendement in de opbouwfase al belast: zie r.568–570 in deze file
+  // (vpbBeleg = rendBelegBVb × vennootschapsbelasting, elk simulatiejaar afgedragen).
+  // Er bouwt geen latente VPB-claim op — er valt niets meer te heffen bij liquidatie.
+  // Gevolg: latenteVpb = 0; hero-getal = (bvBruto − latenteBox2) + priveNetto.
+  //
+  // Onder aankoopwaarde (gereserveerd, 'aankoopwaarde' nog niet uitgeleverd) zou de volledige
+  // ongerealiseerde winst hier integraal worden belast via de getrapte VPB-tarieven.
+  // Die tak wacht op een eigen verificatiefase; infrastructuur (vpbAfrekenmethode-parameter)
+  // staat klaar in BASE_PARAMS.
+  const methode = p.vpbAfrekenmethode ?? 'actuele_waarde';
+  let latenteVpb = 0;
+  if (methode !== 'actuele_waarde' && ongerealiseerdeWinstBV > 0) {
+    const inLaag = Math.min(ongerealiseerdeWinstBV, vpbGrens);
+    const inHoog = Math.max(0, ongerealiseerdeWinstBV - vpbGrens);
+    latenteVpb   = inLaag * vpbTariefLaag + inHoog * vpbTariefHoog;
+  }
+
+  // ── Stap 2: BV na latente VPB ──────────────────────────────────────────────
+  const bvNaVpb = bvBruto - latenteVpb;
+
+  // ── Stap 3: latente box 2 (getrapt) op uitkeerbaar BV-vermogen ─────────────
+  // Richting: bruto BV → box 2-belasting; zelfde tarievenstructuur als bruterDividendBox2
+  // maar toegepast op een gegeven bruto-bedrag (geen grossering nodig).
+  const box2Grens      = vereist(p, 'box2Grens') * (p.fiscaalPartner ? 2 : 1);
+  const box2TariefLaag = vereist(p, 'box2TariefLaag');
+  const box2TariefHoog = vereist(p, 'box2TariefHoog');
+
+  let latenteBox2, box2InLaag, box2InHoog;
+  if (bvNaVpb <= box2Grens) {
+    box2InLaag  = bvNaVpb;
+    box2InHoog  = 0;
+    latenteBox2 = bvNaVpb * box2TariefLaag;
+  } else {
+    box2InLaag  = box2Grens;
+    box2InHoog  = bvNaVpb - box2Grens;
+    latenteBox2 = box2Grens * box2TariefLaag + (bvNaVpb - box2Grens) * box2TariefHoog;
+  }
+
+  // ── Stap 4: privé netto (uitsluitend liquide vermogen) ────────────────────
+  const vrh           = box3Heffing(priveSpaar, priveBeleg, p);
+  const priveVermogen = priveSpaar + priveBeleg;
+  const priveNetto    = priveVermogen - vrh;   // eigenWoning bewust NIET opgeteld
+
+  // ── Stap 5: netto besteedbaar vandaag ─────────────────────────────────────
+  const nettoBesteedbaar = bvNaVpb - latenteBox2 + priveNetto;
+
+  // ── Apart: niet-liquide vermogen (overwaarde eigen woning) ────────────────
+  // Geen term in nettoBesteedbaar. Getoond als losse categorie in de UI.
+  // Verzilvering (verkleinen/herfinancieren) is een toekomstige scenario-hefboom.
+  const eigenWoningNetto   = Math.max(0, (wozWaarde ?? 0) - (hypotheekRestschuld ?? 0));
+  const nietLiquideVermogen = eigenWoningNetto;
+
+  return {
+    bvBruto,
+    latenteVpb,
+    bvNaVpb,
+    latenteBox2,
+    box2InLaag,
+    box2InHoog,
+    priveVermogen,
+    vrh,
+    priveNetto,
+    nettoBesteedbaar,
+    nietLiquideVermogen,   // apart — niet in hero-getal
+  };
+}
+
+/**
+ * Berekent de jaarlijkse box 3-heffing (VRH) op basis van de werkelijke vermogenssplit.
+ *
+ * Volgt de Belastingdienst-systematiek stap voor stap (verificeerbaar tegen ambtelijke publicaties):
+ *   1. fictiefRendement = spaargeld × forfaitSpaar + beleggingen × forfaitBeleg   (op vol vermogen)
+ *   2. rendementsgrondslag = totaal − heffingsvrijVermogen (×2 bij fiscaalPartner)
+ *   3. grondslagverhouding = rendementsgrondslag / totaal
+ *   4. belastbaarRendement = fictiefRendement × grondslagverhouding
+ *   5. heffing = belastbaarRendement × box3Tarief
+ *
+ * Model: forfaitair stelsel — tegenbewijsregeling en schuldenaftrek niet gemodelleerd (zie TECHSCHULD.md).
+ * Leest uitsluitend uit geversioneerde params via vereist() — geen fallback-constanten.
+ *
+ * @param {number} spaargeld    Spaargeldcomponent van het privé-vermogen (€, begin van het jaar)
+ * @param {number} beleggingen  Beleggingscomponent van het privé-vermogen (€, begin van het jaar)
+ * @param {object} p            Params-object (box3ForfaitSpaargeld/Bezittingen/Tarief, heffingsvrijVermogen)
+ * @returns {number}            Jaarlijkse heffing in euro's — vermenigvuldig met frac voor fractioneel jaar
+ */
+export function box3Heffing(spaargeld, beleggingen, p) {
+  const totaal = spaargeld + beleggingen;
+  if (totaal <= 0) return 0;
+
+  const hvv              = vereist(p, 'heffingsvrijVermogen') * (p.fiscaalPartner ? 2 : 1);
+  const rendementsGrondslag = Math.max(0, totaal - hvv);
+  if (rendementsGrondslag === 0) return 0;
+
+  // Stap 1: forfaitair rendement op het volledige vermogen per categorie
+  const fictiefRendement = spaargeld * vereist(p, 'box3ForfaitSpaargeld')
+                         + beleggingen * vereist(p, 'box3ForfaitOverigeBezittingen');
+
+  // Stap 2: aandeel van de rendementsgrondslag in het totale vermogen
+  const grondslagVerhouding = rendementsGrondslag / totaal;
+
+  // Stap 3: heffing = belastbaar fictief rendement × IB-tarief
+  return fictiefRendement * grondslagVerhouding * vereist(p, 'box3Tarief');
+}
+
+/**
+ * Berekent de jaarlijkse VRH voor een specifiek kalenderjaar, met schakelbare overstap naar
+ * werkelijk-rendementstelsel per 2028 (p.box3WerkelijkRendement2028 > 0).
+ *
+ * Wanneer p.box3WerkelijkRendement2028 > 0 én jaar >= 2028:
+ *   fictiefRendement vervangen door werkelijkPct × totaalVermogen;
+ *   grondslag-/vrijstellings-/tariefsystematiek identiek aan box3Heffing:
+ *     werkelijkRendement   = totaal × werkelijkPct
+ *     grondslagVerhouding  = max(0, totaal − hvv) / totaal
+ *     heffing              = werkelijkRendement × grondslagVerhouding × tarief
+ *                          = werkelijkPct × max(0, totaal − hvv) × tarief   [vereenvoudigd]
+ *
+ * Wanneer schakelaar uit (box3WerkelijkRendement2028 = 0) óf jaar < 2028:
+ *   Delegeert ongewijzigd naar box3Heffing(spaargeld, beleggingen, p) — forfaitair stelsel.
+ *
+ * @param {number} spaargeld
+ * @param {number} beleggingen
+ * @param {number} jaar          — kalenderjaar van de simulatiestap (integer)
+ * @param {object} p             — params-object; veld box3WerkelijkRendement2028 optioneel (0 = uit)
+ * @returns {number}             — jaarlijkse heffing in euro's
+ */
+export function box3VrhJaar(spaargeld, beleggingen, jaar, p) {
+  const werkelijkPct = p.box3WerkelijkRendement2028 ?? 0;
+
+  if (werkelijkPct > 0 && jaar >= 2028) {
+    // Werkelijk-rendementstelsel: grondslag/vrijstelling/tarief identiek aan box3Heffing;
+    // uitsluitend het forfaitaire rendement wordt vervangen door werkelijk rendement.
+    const totaal = spaargeld + beleggingen;
+    if (totaal <= 0) return 0;
+    const hvv      = vereist(p, 'heffingsvrijVermogen') * (p.fiscaalPartner ? 2 : 1);
+    const grondslag = Math.max(0, totaal - hvv);
+    if (grondslag === 0) return 0;
+    // Stap 1: werkelijk rendement op het volledige vermogen
+    const werkelijkRendement = totaal * werkelijkPct;
+    // Stap 2: grondslagverhouding (identiek aan box3Heffing)
+    const grondslagVerhouding = grondslag / totaal;
+    // Stap 3: heffing
+    return werkelijkRendement * grondslagVerhouding * vereist(p, 'box3Tarief');
+  }
+
+  return box3Heffing(spaargeld, beleggingen, p);
 }
 
 function runSinglePath(p, start, so, randNorm, strategie = null) {
@@ -279,7 +601,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendSpaarBVn = rendSpaarBVb - vpbSpaar;
 
       const rendBelegPvb = (priveBeleg + inPv * 0.5) * jaarR;
-      const vrh          = prive * p.vermogensrendementsheffing * frac;
+      // box3VrhJaar: correct forfait met heffingsvrijvermogen; schakelt naar werkelijk rendement vanaf 2028
+      const vrh          = box3VrhJaar(priveSpaar, priveBeleg, jaar, p) * frac;
       const rendBelegPvn = rendBelegPvb - vrh;
 
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
@@ -289,7 +612,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const aflosMethodeOp = p.hypotheekAflosMethode ?? 'bank';
       let eenmaligAflosOp  = 0;
       if (aflosMethodeOp === 'bv' && jaar === aflosJaarOp) {
-        eenmaligAflosOp = (p.hypotheekRestschuld ?? 150000) / (1 - p.dividendbelasting);
+        const aflosResult = bruterDividendBox2(p.hypotheekRestschuld, p);  // default=150000 via BASE_PARAMS
+        eenmaligAflosOp = aflosResult.bruto;
       }
 
       bvBeleg = Math.max(0, bvBeleg + inBV + rendBelegBVn - eenmaligAflosOp);
@@ -324,15 +648,17 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const rendBelegBVb = bvBeleg * jaarR;
       const rendBVb      = rendBelegBVb + rendSpaarBVb;
       const winstNaSalaris = Math.max(0, rendBVb - brutoDGAjaar);
+      const vpbGrens = vereist(p, 'vpbGrens');
       const vpb = winstNaSalaris > 0
-        ? (winstNaSalaris <= 200000
-            ? winstNaSalaris * 0.19
-            : 200000 * 0.19 + (winstNaSalaris - 200000) * 0.258)
+        ? (winstNaSalaris <= vpbGrens
+            ? winstNaSalaris * vereist(p, 'vpbTariefLaag')
+            : vpbGrens * vereist(p, 'vpbTariefLaag') + (winstNaSalaris - vpbGrens) * vereist(p, 'vpbTariefHoog'))
         : 0;
       const rendBVn = rendBVb - vpb;
 
       const rendPvb = prive * jaarR;
-      const vrh     = prive * p.vermogensrendementsheffing * frac;
+      // box3VrhJaar: correct forfait met heffingsvrijvermogen; schakelt naar werkelijk rendement vanaf 2028
+      const vrh     = box3VrhJaar(priveSpaar, priveBeleg, jaar, p) * frac;
       const rendPvn = rendPvb - vrh;
 
       const aflosJaar    = p.hypotheekAflosJaar    ?? 2040;
@@ -344,7 +670,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const herfinRentePct = (p.hypotheekHerfinRente ?? 4.5) / 100;
       const herfinR  = herfinRentePct / 12;
       const herfinN  = Math.max(1, (eindHypoJaar - aflosJaar) * 12);
-      const herfinS  = p.hypotheekRestschuld ?? 150000;
+      const herfinS  = p.hypotheekRestschuld;  // default=150000 via BASE_PARAMS
       const maandNa  = herfinR > 0
         ? herfinS * herfinR * Math.pow(1 + herfinR, herfinN) / (Math.pow(1 + herfinR, herfinN) - 1)
         : herfinS / herfinN;
@@ -352,7 +678,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
 
       let eenmaligAflos = 0;
       if (aflosMethode === 'bv' && jaar === aflosJaar) {
-        eenmaligAflos = (p.hypotheekRestschuld ?? 150000) / (1 - p.dividendbelasting);
+        const aflosResultP = bruterDividendBox2(p.hypotheekRestschuld, p);  // default=150000 via BASE_PARAMS
+        eenmaligAflos = aflosResultP.bruto;
       }
 
       const hypotheekAfgelost = (aflosMethode === 'bv'   && jaar >  aflosJaar)
@@ -426,10 +753,11 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const behoefteNaPrive = Math.max(0, behoefteNaExtern - ontPv);
       const nettoDGA    = brutoDGAjaar * (1 - p.inkomstenbelasting);
       const behoefteNaDGA = Math.max(0, behoefteNaPrive - nettoDGA);
-      const brutoDividend = behoefteNaDGA > 0 ? behoefteNaDGA / (1 - p.dividendbelasting) : 0;
+      const divResult     = bruterDividendBox2(behoefteNaDGA, p);
+      const brutoDividend = divResult.bruto;
       const ontBV = brutoDGAjaar + brutoDividend + eenmaligAflos;
 
-      const nettoDividend  = brutoDividend * (1 - p.dividendbelasting);
+      const nettoDividend  = behoefteNaDGA;  // nettoNodig IS het netto dividend — geen herberekening nodig
       const nettoUitBV     = nettoDGA + nettoDividend;
       const nettoInkomen   = nettoUitBV + ontPv + inkSPMS + inkAOW;
 
@@ -445,7 +773,8 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
       const spaarRentePv = p.spaarrentePrive ?? 0.025;
       const rendSpaarPvn = priveSpaar * spaarRentePv * frac;
       const rendBelegPvb = priveBeleg * jaarR;
-      const vrhPv        = prive * p.vermogensrendementsheffing * frac;
+      // box3VrhJaar: correct forfait met heffingsvrijvermogen; schakelt naar werkelijk rendement vanaf 2028
+      const vrhPv        = box3VrhJaar(priveSpaar, priveBeleg, jaar, p) * frac;
       const rendBelegPvn = rendBelegPvb - vrhPv;
       priveBeleg = Math.max(0, priveBeleg + rendBelegPvn - ontPv * (priveBeleg / Math.max(1, prive)));
       priveSpaar = Math.max(0, priveSpaar + rendSpaarPvn - ontPv * (priveSpaar / Math.max(1, prive)));
@@ -476,7 +805,7 @@ function runSinglePath(p, start, so, randNorm, strategie = null) {
         brutoDGA:         Math.round(brutoDGAjaar),
         ibBedrag:         Math.round(brutoDGAjaar * p.inkomstenbelasting),
         brutoDividend:    Math.round(brutoDividend),
-        divBelBedrag:     Math.round(brutoDividend * p.dividendbelasting),
+        divBelBedrag:     Math.round(divResult.belasting),
         vpbBedrag:        Math.round(vpb),
         inkSPMS:          Math.round(inkSPMS),
         inkAOW:           Math.round(inkAOW),
@@ -911,13 +1240,15 @@ export function berekenMaandelijksOnttrektbaar(params, portfolioNominaalPensioen
   const nMaanden = Math.max(12, (uitputtingLft - pensioenLft) * 12);
 
   const rNominaalJaar = p.rendementNaPensioen ?? 0.05;
-  const vrh           = p.vermogensrendementsheffing ?? 0.02088;
   const inflatie      = p.inflatieGemiddeld ?? 0.02;
 
   const cumulInflatie  = Math.pow(1 + inflatie, Math.max(0, jaarTotPensioen));
   const portfolioReeel = portfolioNominaalPensioen / cumulInflatie;
 
-  const rNettoJaar = (1 + rNominaalJaar - vrh) / (1 + inflatie) - 1;
+  // box3Heffing: beleggingen-dominant aangenomen (priveSpaar=0); heffingsvrijvermogen op startportfolio toegepast.
+  // Vereenvoudiging: negeert uitputting en spaargeld-fractie (zie TECHSCHULD.md).
+  const vrhJaar    = portfolioReeel > 0 ? box3Heffing(0, portfolioReeel, p) / portfolioReeel : 0;
+  const rNettoJaar = (1 + rNominaalJaar - vrhJaar) / (1 + inflatie) - 1;
   const rMaand     = Math.pow(1 + Math.max(-0.5, rNettoJaar), 1 / 12) - 1;
 
   if (portfolioReeel <= 0) return 0;

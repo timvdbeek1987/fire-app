@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import JaarTick from '../JaarTick.jsx';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { CheckCircle, Clock } from 'lucide-react';
-import { BASE_PARAMS, fmt, fmtFull, berekenVereistKapitaalAnalytisch } from '../data.js';
+import { BASE_PARAMS, fmt, fmtFull, berekenVereistKapitaalAnalytisch, berekenNettoBesteedbaar } from '../data.js';
 import { InfoTip } from '../Tooltip.jsx';
+import { checkStaleness } from '../fiscalParams.js';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -44,10 +45,13 @@ export default function Dashboard({
   birthYear = BASE_PARAMS.geboortejaar, userType = 'dga',
   partnerActief = false, hasPartner = false, onPartnerToggle,
   vermogenUpdates = [],
+  onParamsChange,   // persistentiepad — zelfde als Instellingen (fire_data.params via App.saveParams)
 }) {
   const [showCalc, setShowCalc] = useState(false);
   const [showOnttrekking, setShowOnttrekking] = useState(false);
   const [inflatieCorrectie, setInflatieCorrectie] = useState(true);
+  const [wfExpand, setWfExpand] = useState(new Set());
+  const toggleWf = key => setWfExpand(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
   const isPrive = userType === 'prive';
   const histRendement = berekenHistorischRendement(vermogenUpdates);
 
@@ -67,7 +71,7 @@ export default function Dashboard({
     const portfolio = isPrive ? priveOpPensioendag : totaalOpPensioendag;
     if (!portfolio || !nominaalVastBedrag) return uitputtingLftMO - pensioenLeeftijdMO;
     const rNom = params.rendementNaPensioen ?? BASE_PARAMS.rendementNaPensioen ?? 0.05;
-    const vrh  = params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing ?? 0.02088;
+    const vrh  = params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing;
     const rM = Math.pow(1 + Math.max(-0.5, rNom - vrh), 1 / 12) - 1;
     let n;
     if (Math.abs(rM) < 0.000001) {
@@ -107,6 +111,26 @@ export default function Dashboard({
   const priveNu          = (start.prive ?? 0) + (partnerActief ? (params.partnerPriveNu ?? 0) : 0);
   const totaalNu         = bvNu + priveNu;
   const inlegGezamenlijk = (params.inlegJaarlijksPrive ?? 0) + (partnerActief ? (params.partnerInlegPrive ?? 0) : 0);
+
+  // Waterfall (1c-ii): netto besteedbaar vandaag — §5.2
+  const priveSpaarNu     = start.priveSpaar ?? 0;
+  const priveBelegNu     = Math.max(0, priveNu - priveSpaarNu);
+  const wozWaarde        = params.wozWaarde ?? 0;
+  // Onder de actuele-waarde-methode (default) rekent de opbouwfase het beleggingsrendement
+  // al jaarlijks af met VPB (data.js r.568–570). Er bouwt geen latente VPB-claim op —
+  // ongerealiseerdeWinstBV = 0 zodat berekenNettoBesteedbaar latenteVpb = 0 geeft.
+  const ongerealiseerdeWinstBV = 0;
+  const waterfall = !isPrive && bvNu > 0
+    ? berekenNettoBesteedbaar({
+        bvBruto:               bvNu,
+        ongerealiseerdeWinstBV,
+        priveSpaar:            priveSpaarNu,
+        priveBeleg:            priveBelegNu,
+        wozWaarde,
+        hypotheekRestschuld:   params.hypotheekRestschuld ?? 0,
+        p:                     params,
+      })
+    : null;
   const currentAge       = CURRENT_YEAR - birthYear;
 
   // Countdown
@@ -166,6 +190,7 @@ export default function Dashboard({
   const fillPct   = pkComfort  > 0 ? Math.min(100, progressRef / refMax * 100) : 0;
 
   const kansSucces = mcResult?.kansSucces ?? 0;
+  const stalenessCheck = checkStaleness();
 
   // Inkomen tiers
   const inkomenTiers = [
@@ -176,6 +201,11 @@ export default function Dashboard({
 
   return (
     <div>
+      {stalenessCheck.items?.map((item, i) => (
+        <div key={i} style={{ padding: '0.5rem 0.8rem', background: item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.08)', border: `1px solid ${item.type === 'verkeerd_jaar' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`, borderRadius: 'var(--r)', marginBottom: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: item.type === 'verkeerd_jaar' ? '#dc2626' : '#b45309' }}>
+          {item.type === 'verkeerd_jaar' ? '🚨' : '⚠️'} {item.reden}
+        </div>
+      ))}
       <div className="section-header">
         <div>
           <div className="section-eyebrow">Dashboard</div>
@@ -275,6 +305,160 @@ export default function Dashboard({
         )}
       </div>
 
+      {/* ── Waterfall: Netto Besteedbaar Vandaag (1c-ii) ── */}
+      {!isPrive && waterfall && (
+        <div className="card" style={{ marginBottom: '1.25rem', borderTop: '3px solid var(--accent)' }}>
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '0.2rem' }}>
+                Netto Besteedbaar Vandaag
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>
+                {fmt(Math.round(waterfall.nettoBesteedbaar))}
+              </div>
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-4)', textAlign: 'right', maxWidth: 280, lineHeight: 1.5 }}>
+              fiscale regels belastingjaar 2026, ongewijzigd doorgetrokken — toekomstige wijzigingen niet voorspeld
+            </div>
+          </div>
+
+          {/* Waterfall rows */}
+          {[
+            {
+              key:    'bv',
+              teken:  '',
+              label:  'Bruto BV',
+              bedrag: waterfall.bvBruto,
+              sub:    'marktwaarde zoals ingevoerd (liquide + beleggingen)',
+              detail: null,
+            },
+            {
+              key:    'vpb',
+              teken:  '−',
+              label:  'Latente VPB',
+              bedrag: waterfall.latenteVpb,
+              kleur:  'var(--red)',
+              sub:    null,
+              subLabel: 'actuele-waarde-methode — jaarlijks reeds afgerekend',
+              detail: (
+                <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+                  <div>
+                    Actieve methode: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>actuele waarde</span>
+                  </div>
+                  <div style={{ marginTop: '0.3rem' }}>
+                    Het beleggingsrendement in de BV wordt in de projectie elk jaar belast met VPB
+                    (19% vlak tarief, opbouwfase). Er accumuleert geen ongerealiseerde koerswinst
+                    waarover bij liquidatie nog VPB verschuldigd is — latente VPB = €0.
+                  </div>
+                  <div style={{ marginTop: '0.3rem', color: 'var(--text-4)' }}>
+                    De keuze tussen actuele-waarde- en aankoopwaarde-methode wordt in een volgende
+                    versie instelbaar. Zie Instellingen → VPB-tarieven voor de actieve methode.
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key:    'box2',
+              teken:  '−',
+              label:  'Latente box 2',
+              bedrag: waterfall.latenteBox2,
+              kleur:  'var(--red)',
+              sub:    `getrapt 24,5% / 31% · lage schijf ${fmt(Math.round(waterfall.box2InLaag))}${waterfall.box2InHoog > 0 ? ` · hoge schijf ${fmt(Math.round(waterfall.box2InHoog))}` : ''}${params.fiscaalPartner ? ' · drempel ×2 (partner)' : ''}`,
+              detail: (
+                <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+                  <div>Grondslag: BV na latente VPB = {fmt(Math.round(waterfall.bvNaVpb))}</div>
+                  {waterfall.box2InHoog > 0 ? (
+                    <>
+                      <div>Lage schijf (≤ €{(params.box2Grens ?? BASE_PARAMS.box2Grens).toLocaleString('nl-NL')}{params.fiscaalPartner ? ' ×2' : ''}): {fmt(Math.round(waterfall.box2InLaag))} × 24,5% = {fmt(Math.round(waterfall.box2InLaag * 0.245))}</div>
+                      <div>Hoge schijf (restant): {fmt(Math.round(waterfall.box2InHoog))} × 31% = {fmt(Math.round(waterfall.box2InHoog * 0.31))}</div>
+                    </>
+                  ) : (
+                    <div>Volledig lage schijf: {fmt(Math.round(waterfall.box2InLaag))} × 24,5% = {fmt(Math.round(waterfall.latenteBox2))}</div>
+                  )}
+                  <div style={{ marginTop: '0.3rem', color: 'var(--text-4)' }}>Latente belasting — verschuldigd bij uitkering als dividend. Geen cashflow-effect zolang BV aangehouden wordt.</div>
+                </div>
+              ),
+            },
+            {
+              key:    'prive',
+              teken:  '+',
+              label:  'Privé netto',
+              bedrag: waterfall.priveNetto,
+              kleur:  waterfall.priveNetto >= 0 ? 'var(--green)' : 'var(--red)',
+              sub:    `vermogen ${fmt(waterfall.priveVermogen)} − VRH ${fmt(Math.round(waterfall.vrh))}`,
+              detail: (
+                <div style={{ marginTop: '0.6rem', padding: '0.65rem 0.75rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.7 }}>
+                  <div>Privévermogen (box 3): {fmt(waterfall.priveVermogen)}</div>
+                  <div>VRH (box 3-heffing, jaarlijks): − {fmt(Math.round(waterfall.vrh))} · forfaitair stelsel 2026</div>
+                  <div style={{ marginTop: '0.3rem', fontWeight: 600, color: 'var(--text)' }}>
+                    Privé netto = {fmt(Math.round(waterfall.priveNetto))}
+                  </div>
+                  <div style={{ marginTop: '0.2rem', color: 'var(--text-4)' }}>
+                    Eigen woning — zie &#34;Niet-liquide vermogen&#34; hieronder (niet opgeteld bij besteedbaar)
+                  </div>
+                </div>
+              ),
+            },
+          ].map(({ key, teken, label, bedrag, kleur, sub, subLabel, detail }) => (
+            <div key={key}>
+              <div
+                onClick={() => toggleWf(key)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 0', borderBottom: '1px solid var(--border-faint, rgba(0,0,0,0.06))', cursor: 'pointer', userSelect: 'none' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: kleur ?? 'var(--text)', width: 10, flexShrink: 0 }}>{teken}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text)', fontWeight: 500 }}>{label}</div>
+                    {sub && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-3)', marginTop: '0.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
+                    {subLabel && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--amber)', marginTop: '0.05rem' }}>{subLabel}</div>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 600, color: kleur ?? 'var(--text)' }}>
+                    {teken && bedrag > 0 ? `${teken} ` : ''}{fmt(Math.round(bedrag))}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-4)' }}>{wfExpand.has(key) ? '▲' : '▼'}</span>
+                </div>
+              </div>
+              {wfExpand.has(key) && detail && detail}
+            </div>
+          ))}
+
+          {/* Totaallijn */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0 0.2rem', marginTop: '0.1rem', borderTop: '2px solid var(--accent)' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>= Netto besteedbaar vandaag</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)' }}>
+              {fmt(Math.round(waterfall.nettoBesteedbaar))}
+            </div>
+          </div>
+
+          {/* Niet-liquide vermogen — eigen woning (apart, niet in hero-getal) */}
+          {waterfall.nietLiquideVermogen > 0 && (
+            <div style={{ marginTop: '0.85rem', padding: '0.6rem 0.8rem', background: 'rgba(99,102,241,0.05)', borderRadius: 'var(--r)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', fontWeight: 500, color: 'var(--text)' }}>
+                    Niet-liquide vermogen — eigen woning
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-3)', marginTop: '0.05rem' }}>
+                    WOZ − hypotheek · niet opgeteld bij netto besteedbaar
+                  </div>
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 600, color: 'rgba(99,102,241,0.9)', flexShrink: 0 }}>
+                  {fmt(Math.round(waterfall.nietLiquideVermogen))}
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.60rem', color: 'var(--text-4)', marginTop: '0.35rem', lineHeight: 1.55 }}>
+                Verzilvering (verkleinen / herfinancieren) is een toekomstige scenario-hefboom — bewust buiten het besteedbare getal gehouden.
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* Gerealiseerd rendement */}
       {histRendement && (
         <div className="card" style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
@@ -319,6 +503,9 @@ export default function Dashboard({
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.1rem' }}>
                 {isPrive ? 'In euro\'s van vandaag · excl. AOW & pensioen' : 'Vóór dividendbelasting · excl. AOW & pensioen'}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', color: 'var(--text-4)', marginTop: '0.1rem' }}>
+                Methode: annuïteit op P50-portefeuille · Onttrekking-scherm vergelijkt ook 4%-Regel en VPW — afwijking is verwacht en correct
               </div>
             </div>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', flexShrink: 0 }}>
@@ -416,14 +603,16 @@ export default function Dashboard({
 
               {/* Methodologie-noot */}
               <div style={{ marginTop: '1rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
-                ⚠️ <b>Let op:</b> dit bedrag is gebaseerd op het <b>normaal scenario</b> (verwachte portefeuille, mediaan van 2500 simulaties). De FIRE Countdown gebruikt een strengere maatstaf: het vereiste kapitaal waarbij 80% van alle scenario's de portefeuille in stand houdt. Daardoor kan het onttrekkingsbedrag hier hoger lijken dan wat de Countdown als "haalbaar" markeert.
+                ⚠️ <b>Dit getal is een snelle indicatie, geen advies.</b> Twee bekende verschillen met andere getallen in de app:
+                {' '}(1) <b>vs. FIRE Countdown:</b> de Countdown gebruikt een strengere maatstaf (80% van 2500 scenario's houdt portefeuille in stand tot 85j) — daardoor kan dit bedrag hoger lijken dan wat de Countdown als "haalbaar" markeert.
+                {' '}(2) <b>vs. Onttrekking-scherm:</b> dit getal gebruikt de annuïteit-methode (vaste onttrekking, pot leeg op uitputtingsleeftijd). De Onttrekking-pagina rekent daarnaast ook de 4%-Regel (4% van startportefeuille) en VPW (variabel percentage van huidige portefeuille) door — die strategieën hebben andere eigenschappen en geven andere bedragen. Dat is correct: het zijn verschillende keuzes, geen fouten.
               </div>
 
               {/* Belastingnoot */}
               <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.8rem', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
                 {isPrive
-                  ? <>💡 <b>Belastingen:</b> VRH (box 3, ~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Onttrekkingen uit privévermogen zijn zelf belastingvrij.</>
-                  : <>💡 <b>Belastingen:</b> VRH (~{((params.vermogensrendementsheffing ?? 0.02088) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Dividendbelasting (~{((params.dividendbelasting ?? 0.245) * 100).toFixed(0)}%) op BV-uitkeringen is <b>nog niet verwerkt</b> — het werkelijke netto besteedbare bedrag ligt lager.</>
+                  ? <>💡 <b>Belastingen:</b> VRH (box 3, ~{((params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Onttrekkingen uit privévermogen zijn zelf belastingvrij.</>
+                  : <>💡 <b>Belastingen:</b> VRH (~{((params.vermogensrendementsheffing ?? BASE_PARAMS.vermogensrendementsheffing) * 100).toFixed(1)}%/jr) is verwerkt in het rendement. Box 2-heffing (onttrekking via dividend uit BV) is verwerkt in de projectie via de bruteringsfunctie.</>
                 }
               </div>
             </div>
